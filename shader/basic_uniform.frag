@@ -181,6 +181,14 @@ vec4 pass5()
     // Retrieve high-res color from texture
     vec4 color = texture(HdrTex, TexCoord);
 
+    if (BloomEnabled)
+    {
+        // Combine with blurred texture for Bloom
+        // We want linear filtering on this texture access so that we get additional blurring.
+        vec4 blurTex = texture(BlurTex1, TexCoord);
+        color += blurTex;
+    }
+
     // Convert from RGB to CIE XYZ
     vec3 xyzCol = rgb2xyz * vec3(color);
 
@@ -200,14 +208,7 @@ vec4 pass5()
     // Convert back to RGB
     vec4 toneMapColor = vec4( xyz2rgb * xyzCol, 1.0);
 
-    // Combine with blurred texture for Bloom
-    // We want linear filtering on this texture access so that we get additional blurring.
-    vec4 blurTex = texture(BlurTex1, TexCoord);
-
-    if (BloomEnabled)
-        return toneMapColor + blurTex;
-    else
-        return toneMapColor;
+    return toneMapColor;
 }
 
 void main() {

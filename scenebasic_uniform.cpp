@@ -416,10 +416,7 @@ void SceneBasic_Uniform::pass2() // Draw the blur
     view = mat4(1.0f);
     projection = mat4(1.0f);
 
-    gunProg.use();
     setMatrices(gunProg);
-    planeProg.use();
-    setMatrices(planeProg);
 
     glBindVertexArray(fsQuad);
     glDrawArrays(GL_TRIANGLES, 0, 6);
