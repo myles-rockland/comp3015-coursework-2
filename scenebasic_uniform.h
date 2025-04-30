@@ -39,7 +39,6 @@ private:
     float angle;
     float rotSpeed;
 
-    bool alphaMapEnabled;
     bool whiteLightsEnabled;
     bool bloomEnabled;
 

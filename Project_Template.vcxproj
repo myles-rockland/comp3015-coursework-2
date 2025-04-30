@@ -171,6 +171,7 @@ xcopy /y /i /e "$(ProjectDir)shader" "$(OutDir)shader\"</Command>
   <ItemGroup>
     <None Include="shader\basic_uniform.frag" />
     <None Include="shader\basic_uniform.vert" />
+    <None Include="shader\pbr.frag" />
     <None Include="shader\plane.frag" />
     <None Include="shader\plane.vert" />
     <None Include="shader\skybox.frag" />

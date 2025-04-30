@@ -6,30 +6,22 @@ in vec3 Position;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 3) uniform sampler2D DiffuseTexture;
+layout (binding = 3) uniform sampler2D AlbedoTexture;
 layout (binding = 4) uniform sampler2D NormalTexture;
-layout (binding = 5) uniform sampler2D AlphaTexture;
+layout (binding = 5) uniform sampler2D MetalTexture;
+layout (binding = 6) uniform sampler2D RoughnessTexture;
 
 layout (binding = 0) uniform sampler2D HdrTex;
 layout (binding = 1) uniform sampler2D BlurTex1;
 layout (binding = 2) uniform sampler2D BlurTex2;
 
-uniform struct MaterialInfo
-{
-    vec3 Kd;
-    vec3 Ka;
-    vec3 Ks;
-    float Shininess;
-} Material;
-
 uniform struct SpotLightInfo
 {
     vec4 Position;
-    vec3 La;
     vec3 L;
     vec3 Direction;
-    float Exponent;
-    float Cutoff;
+    //float InnerCutoff; // InnerCutoff
+    float Cutoff; // OuterCutoff
 } Spotlights[3];
 
 uniform int Pass;
@@ -42,7 +34,6 @@ uniform float Exposure;
 uniform float White;
 uniform float Gamma;
 
-uniform bool AlphaMapEnabled;
 uniform bool BloomEnabled;
 
 uniform mat3 rgb2xyz = mat3(
@@ -57,44 +48,95 @@ uniform mat3 xyz2rgb = mat3(
     -0.4985314, 0.0415560, 1.0572252
 );
 
+const float PI = 3.14159265358979323846;
+
 float luminance(vec3 colour)
 {
     return colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
 }
 
-vec3 blinnphongSpot(vec3 n, int lightIndex)
+// normal distribution function for approximating ratio of microfacets aligned to h
+float ggxDistribution(float nDotH, float roughness) 
+{ 
+    float alpha2 = roughness * roughness * roughness * roughness;
+    float d = (nDotH * nDotH) * (alpha2 - 1) + 1;
+    return alpha2 / (PI * d * d);
+}
+
+// geometry function for approximating area where microfacets overshadow each other, causing light occlusion
+float geomSchlickGGX(float dotProd, float roughness)
 {
-    vec3 ambient = vec3(0), diffuse = vec3(0), specular = vec3(0);
+    float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+    float denom = dotProd * (1 - k) + k;
+    return 1.0 / denom; // This should be dotProd / denom, but this saves some computation. Tradeoff between visual accuracy and performance
+}
 
-    // Get base texture colour from diffuse texture
-    vec3 texColour = texture(DiffuseTexture, TexCoord).rgb;
+vec3 fresnelSchlick(float dotProd, vec3 f0) // Fresnel reflection equation
+{
+    return f0 + (1 - f0) * pow(1.0 - dotProd, 5);
+}
 
-    // Ambient
-    ambient = Spotlights[lightIndex].La * texColour;
+vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equation
+{ 
+    // lights in reflectance
+    vec3 l = vec3(0.0); // Direction towards light
+    vec3 lightIntensity = vec3(0.0); // AKA Radiance/Strength/Magnitude/Colour
 
-    // Diffuse
-    vec3 s = normalize(Spotlights[lightIndex].Position.xyz - Position);
+    vec3 s = normalize(Spotlights[lightIndex].Position.xyz - position);
 
     float cosAngle = dot(-s, normalize(Spotlights[lightIndex].Direction));
     float angle = acos(cosAngle);
-    float spotScale;
 
-    if (angle >= 0.0f && angle < Spotlights[lightIndex].Cutoff)
+    if (angle >= 0.0f && angle < Spotlights[lightIndex].Cutoff) // OuterCutoff
     {
-        spotScale = pow(cosAngle, Spotlights[lightIndex].Exponent);
-        float sDotN = max(dot(s, n), 0.0);
-        diffuse = texColour * sDotN;
+        // let's say 10 and 15
+        // we have 11
+        // 11 - 10 = 1
+        // 15 - 10 = 5
+        // 1/5 = 0.2
+        //float interpolation = (angle - Spotlights[lightIndex].InnerCutoff) / (Spotlights[lightIndex].OuterCutoff - Spotlights[lightIndex].InnerCutoff);
+        //float epsilon = cos(Spotlights[lightIndex].OuterCutoff) - cos(Spotlights[lightIndex].InnerCutoff);
+        //float intensity = clamp((cosAngle - cos(Spotlights[lightIndex].OuterCutoff)) / epsilon, 0.0, 1.0);
+        lightIntensity = Spotlights[lightIndex].L;
 
-        // Specular
-        if (sDotN > 0.0)
-        {
-            vec3 v = normalize(ViewDir);
-            vec3 h = normalize(v + s);
-            specular = Material.Ks * pow(max(dot(h,n),0.0), Material.Shininess);
-        }
+        l = Spotlights[lightIndex].Position.xyz - position;
+        float dist = length(l);
+        l = normalize(l);
+        lightIntensity /= (dist * dist); // attenuation
     }
 
-    return ambient + spotScale * Spotlights[lightIndex].L * (diffuse + specular);
+    // Get metalness and albedo
+    vec3 f0 = vec3(0.04);
+    float metalness = texture(MetalTexture, TexCoord).r;
+    vec3 albedo = pow(texture(AlbedoTexture, TexCoord).rgb, vec3(Gamma)); // convert to linear space as albedo is authored in sRGB space
+    f0 = mix(f0, albedo.rgb, metalness);
+
+    // Calculate specular component
+    float roughness = max(dot(texture(RoughnessTexture, TexCoord), vec4(1.0)), 0.0); // Transform sample into float representing grey shade. Might need to do 1 - roughness
+    vec3 v = normalize(-position);
+    vec3 h = normalize(v + l);
+    float nDotH = max(dot(n, h), 0.0); // Ensure non-negative values
+    float vDotH = max(dot(v, h), 0.0);
+    float nDotL = max(dot(n, l), 0.0);
+    float nDotV = max(dot(n, v), 0.0);
+
+    // Cook-Torrance BRDF specular part
+    float normalDistribution = ggxDistribution(nDotH, roughness);
+    float geometry = geomSchlickGGX(nDotL, roughness) * geomSchlickGGX(nDotV, roughness);
+    vec3 fresnel = fresnelSchlick(vDotH, f0);
+    
+    vec3 specularComponent = fresnel;
+    vec3 numerator = normalDistribution * geometry * fresnel;
+    float denominator = 4.0 * max(dot(n, v), 0.0) * max(dot(n, l), 0.0) + 0.0001; // Add epsilon for non-zero denominator
+    vec3 specular = numerator / denominator;
+
+    // diffuse part
+    vec3 diffuseComponent = vec3(1.0) - specularComponent;
+    diffuseComponent *= 1.0 - metalness;
+    vec3 diffuse = diffuseComponent * (albedo / PI);    
+    
+    // return final radiance
+    return (diffuse + specular) * lightIntensity * nDotL;
 }
 
 // Pass 1 applies normal mapping, alpha discard and blinnphong lighting for 3 spotlights
@@ -106,28 +148,21 @@ vec4 pass1()
 
     vec3 Colour = vec3(0.0f, 0.0f, 0.0f);
 
-    // Discard using alpha map
-    vec4 alphaMap = texture(AlphaTexture, TexCoord);
-
-    if (AlphaMapEnabled && alphaMap.a < 0.15f)
+    // Loop through all lights for PBR
+    if (gl_FrontFacing)
     {
-        discard;
+        for (int i = 0; i < 3; i++)
+        {
+            //Colour += blinnphongSpot(normalize(norm), i);
+            Colour += microfacetModel(i, Position, normalize(norm));
+        }
     }
     else
     {
-        if (gl_FrontFacing)
+        for (int i = 0; i < 3; i++)
         {
-            for (int i = 0; i < 3; i++)
-            {
-                Colour += blinnphongSpot(normalize(norm), i);
-            }
-        }
-        else
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                Colour += blinnphongSpot(normalize(-norm), i);
-            }
+            //Colour += blinnphongSpot(normalize(-norm), i);
+            Colour += microfacetModel(i, Position, normalize(-norm));
         }
     }
 
@@ -175,9 +210,9 @@ vec4 pass4()
     return sum;
 }
 
+// Bloom + HDR Tone Mapping + Gamma Correction
 vec4 pass5() 
 {
-    // HDR + Tone Mapping
     // Retrieve high-res color from texture
     vec4 color = texture(HdrTex, TexCoord);
 
@@ -194,11 +229,11 @@ vec4 pass5()
 
     // Convert from XYZ to xyY
     float xyzSum = xyzCol.x + xyzCol.y + xyzCol.z;
-    vec3 xyYCol = vec3( xyzCol.x / xyzSum, xyzCol.y / xyzSum, xyzCol.y);
+    vec3 xyYCol = vec3(xyzCol.x / xyzSum, xyzCol.y / xyzSum, xyzCol.y);
 
     // Apply the tone mapping operation to the luminance (xyYCol.z or xyzCol.y)
-    float L = (Exposure * xyYCol.z) / AveLum;
-    L = (L * ( 1 + L / (White * White) )) / ( 1 + L );
+    float L = (Exposure * xyYCol.z) / 0.5; //float L = (Exposure * xyYCol.z) / AveLum;
+    L = (L * (1 + L / (White * White))) / (1 + L);
 
     // Using the new luminance, convert back to XYZ
     xyzCol.x = (L * xyYCol.x) / (xyYCol.y);
@@ -206,7 +241,10 @@ vec4 pass5()
     xyzCol.z = (L * (1 - xyYCol.x - xyYCol.y))/xyYCol.y;
 
     // Convert back to RGB
-    vec4 toneMapColor = vec4( xyz2rgb * xyzCol, 1.0);
+    vec4 toneMapColor = vec4(xyz2rgb * xyzCol, 1.0);
+
+    // Gamma correct
+    toneMapColor = vec4(pow(vec3(toneMapColor), vec3(1.0 / Gamma)), 1.0);
 
     return toneMapColor;
 }
@@ -216,5 +254,5 @@ void main() {
     else if (Pass == 2) FragColor = pass2();
     else if (Pass == 3) FragColor = pass3();
     else if (Pass == 4) FragColor = pass4();
-    else if (Pass == 5) FragColor = vec4(pow(vec3(pass5()), vec3(1.0 / Gamma)), 1.0);
+    else if (Pass == 5) FragColor = pass5();
 }

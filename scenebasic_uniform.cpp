@@ -24,7 +24,6 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     tPrev(0),
     angle(0.0f),
     rotSpeed(pi<float>() / 8.0f),
-    alphaMapEnabled(true),
     whiteLightsEnabled(true),
     bloomEnabled(true),
     cameraPosition(0.0f, 0.0f, 10.0f),
@@ -38,7 +37,8 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     lastXPos(width / 2.0f),
     lastYPos(height / 2.0f)
 {
-    gun = ObjMesh::load("media/38-special-revolver/source/rev_anim.obj.obj", false, true);
+    //gun = ObjMesh::load("media/38-special-revolver/source/rev_anim.obj.obj", false, true);
+    gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
 }
 
 void SceneBasic_Uniform::initScene()
@@ -59,37 +59,30 @@ void SceneBasic_Uniform::initScene()
     // Set spotlights ambient diffuse specular uniforms
     // Gun program
     gunProg.use();
-    gunProg.setUniform("Spotlights[0].La", vec3(0.2f)); //0.2, 0, 0
-    gunProg.setUniform("Spotlights[0].L", vec3(1.0f)); //0.8, 0, 0
-    gunProg.setUniform("Spotlights[1].La", vec3(0.2f)); //0, 0.2, 0
-    gunProg.setUniform("Spotlights[1].L", vec3(1.0f)); //0, 0.8, 0
-    gunProg.setUniform("Spotlights[2].La", vec3(0.2f)); //0, 0, 0.2
-    gunProg.setUniform("Spotlights[2].L", vec3(1.0f)); //0, 0, 0.8
+    gunProg.setUniform("Spotlights[0].L", vec3(2500.0f)); //0.8, 0, 0
+    gunProg.setUniform("Spotlights[1].L", vec3(2500.0f)); //0, 0.8, 0
+    gunProg.setUniform("Spotlights[2].L", vec3(2500.0f)); //0, 0, 0.8
     // Plane program
     planeProg.use();
-    planeProg.setUniform("Spotlights[0].La", vec3(0.2f)); //0.2, 0, 0
-    planeProg.setUniform("Spotlights[0].L", vec3(1.0f)); //0.8, 0, 0
-    planeProg.setUniform("Spotlights[1].La", vec3(0.2f)); //0, 0.2, 0
-    planeProg.setUniform("Spotlights[1].L", vec3(1.0f)); //0, 0.8, 0
-    planeProg.setUniform("Spotlights[2].La", vec3(0.2f)); //0, 0, 0.2
-    planeProg.setUniform("Spotlights[2].L", vec3(1.0f)); //0, 0, 0.8
-
-    // Set spotlights exponent uniforms
-    for (int i = 0; i < 3; i++)
-    {
-        std::stringstream exponentName;
-        exponentName << "Spotlights[" << i << "].Exponent";
-        gunProg.use();
-        gunProg.setUniform(exponentName.str().c_str(), 50.0f);
-        planeProg.use();
-        planeProg.setUniform(exponentName.str().c_str(), 50.0f);
-    }
+    planeProg.setUniform("Spotlights[0].L", vec3(2500.0f)); //0.8, 0, 0
+    planeProg.setUniform("Spotlights[1].L", vec3(2500.0f)); //0, 0.8, 0
+    planeProg.setUniform("Spotlights[2].L", vec3(2500.0f)); //0, 0, 0.8
 
     // Set spotlights cutoff uniforms
+    //for (int i = 0; i < 3; i++)
+    //{
+    //    std::stringstream cutoffName;
+    //    cutoffName << "Spotlights[" << i << "].InnerCutoff"; // InnerCutoff
+    //    gunProg.use();
+    //    gunProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+    //    planeProg.use();
+    //    planeProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+    //}
+
     for (int i = 0; i < 3; i++)
     {
         std::stringstream cutoffName;
-        cutoffName << "Spotlights[" << i << "].Cutoff";
+        cutoffName << "Spotlights[" << i << "].Cutoff"; // OuterCutoff
         gunProg.use();
         gunProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
         planeProg.use();
@@ -103,23 +96,25 @@ void SceneBasic_Uniform::initScene()
     gunProg.setUniform("White", 0.982f);
     gunProg.setUniform("Gamma", 2.2f);
     gunProg.setUniform("BloomEnabled", bloomEnabled);
-    gunProg.setUniform("AlphaMapEnabled", alphaMapEnabled);
 
     // Load skybox texture
     GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
 
     // Load regular textures
-    GLuint diffuseTexture = Texture::loadTexture("media/38-special-revolver/textures/rev_d.tga.png");
-    GLuint normalTexture = Texture::loadTexture("media/38-special-revolver/textures/rev_n.tga.png");
-    GLuint alphaTexture = Texture::loadTexture("media/texture/dots_alpha.png");
+    GLuint albedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
+    GLuint normalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
+    GLuint metallicTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Metallic.png");
+    GLuint roughnessTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Roughness.png");
 
     // Set active texture unit and bind loaded texture ids to texture buffers
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, diffuseTexture);
+    glBindTexture(GL_TEXTURE_2D, albedoTexture);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, normalTexture);
     glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, alphaTexture);
+    glBindTexture(GL_TEXTURE_2D, metallicTexture);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, roughnessTexture);
     
     // Set texture unit to 0 and bind cubemap
     glActiveTexture(GL_TEXTURE0);
@@ -272,12 +267,6 @@ void SceneBasic_Uniform::update( float t )
     {
         cameraPosition -= cameraUp * cameraSpeed * deltaT;
     }
-    if (glfwGetKey(windowContext, GLFW_KEY_1) == GLFW_PRESS) // Toggle alpha map
-    {
-        alphaMapEnabled = !alphaMapEnabled;
-        gunProg.use();
-        gunProg.setUniform("AlphaMapEnabled", alphaMapEnabled);
-    }
     if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
     {
         whiteLightsEnabled = !whiteLightsEnabled;
@@ -285,12 +274,9 @@ void SceneBasic_Uniform::update( float t )
         {
             // Gun program
             gunProg.use();
-            gunProg.setUniform("Spotlights[0].La", vec3(0.2f)); //0.2, 0, 0
-            gunProg.setUniform("Spotlights[0].L", vec3(1.0f)); //0.8, 0, 0
-            gunProg.setUniform("Spotlights[1].La", vec3(0.2f)); //0, 0.2, 0
-            gunProg.setUniform("Spotlights[1].L", vec3(1.0f)); //0, 0.8, 0
-            gunProg.setUniform("Spotlights[2].La", vec3(0.2f)); //0, 0, 0.2
-            gunProg.setUniform("Spotlights[2].L", vec3(1.0f)); //0, 0, 0.8
+            gunProg.setUniform("Spotlights[0].L", vec3(10.0f)); //0.8, 0, 0
+            gunProg.setUniform("Spotlights[1].L", vec3(10.0f)); //0, 0.8, 0
+            gunProg.setUniform("Spotlights[2].L", vec3(10.0f)); //0, 0, 0.8
             // Plane program
             planeProg.use();
             planeProg.setUniform("Spotlights[0].La", vec3(0.2f)); //0.2, 0, 0
@@ -304,12 +290,9 @@ void SceneBasic_Uniform::update( float t )
         {
             // Gun program
             gunProg.use();
-            gunProg.setUniform("Spotlights[0].La", vec3(0.2f, 0.0f, 0.0f)); //0.2, 0, 0
-            gunProg.setUniform("Spotlights[0].L", vec3(0.8f, 0.0f, 0.0f)); //0.8, 0, 0
-            gunProg.setUniform("Spotlights[1].La", vec3(0.0f, 0.2f, 0.0f)); //0, 0.2, 0
-            gunProg.setUniform("Spotlights[1].L", vec3(0.0f, 0.8f, 0.0f)); //0, 0.8, 0
-            gunProg.setUniform("Spotlights[2].La", vec3(0.0f, 0.0f, 0.2f)); //0, 0, 0.2
-            gunProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, 0.8f)); //0, 0, 0.8
+            gunProg.setUniform("Spotlights[0].L", vec3(10.0f, 0.0f, 0.0f)); //0.8, 0, 0
+            gunProg.setUniform("Spotlights[1].L", vec3(0.0f, 10.0f, 0.0f)); //0, 0.8, 0
+            gunProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, 10.0f)); //0, 0, 0.8
             // Plane program
             planeProg.use();
             planeProg.setUniform("Spotlights[0].La", vec3(0.2f, 0.0f, 0.0f)); //0.2, 0, 0
@@ -477,7 +460,7 @@ void SceneBasic_Uniform::drawScene()
         positionName << "Spotlights[" << i << "].Position";
         float x = 50.0f * sin(angle + (two_pi<float>() / 3) * i);
         float z = 50.0f * cos(angle + (two_pi<float>() / 3) * i);
-        vec4 lightPos = vec4(x, 20.0f, z, 1.0f);
+        vec4 lightPos = vec4(x, 15.0f, z, 1.0f);
         gunProg.use();
         gunProg.setUniform(positionName.str().c_str(), view * lightPos);
         planeProg.use();
@@ -507,10 +490,10 @@ void SceneBasic_Uniform::drawScene()
     planeProg.use();
 
     // Set plane material uniforms
-    planeProg.setUniform("Material.Kd", vec3(0.5f));
-    planeProg.setUniform("Material.Ks", vec3(0.0f));
-    planeProg.setUniform("Material.Ka", vec3(0.5f));
-    planeProg.setUniform("Material.Shininess", 1.0f);
+    planeProg.setUniform("Material.Albedo", vec3(0.5f));
+    planeProg.setUniform("Material.Metallic", 0.0f);
+    planeProg.setUniform("Material.Roughness", 0.5f);
+    planeProg.setUniform("Material.AO", 1.0f);
 
     // Set plane model matrix
     model = mat4(1.0f);
@@ -523,18 +506,12 @@ void SceneBasic_Uniform::drawScene()
     // Gun rendering
     gunProg.use();
 
-    // Set material uniforms
-    gunProg.setUniform("Material.Kd", vec3(0.2f, 0.55f, 0.9f));
-    gunProg.setUniform("Material.Ks", vec3(0.95f, 0.95f, 0.95f));
-    gunProg.setUniform("Material.Ka", vec3(0.2f * 0.3f, 0.55f * 0.3f, 0.9f * 0.3f));
-    gunProg.setUniform("Material.Shininess", 100.0f);
-
     // Set gun model matrix
     model = mat4(1.0f);
-    model = translate(model, vec3(0.0f, 0.0f, -5.0f));
-    model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
-    model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
-    model = scale(model, vec3(0.05f));
+    //model = translate(model, vec3(0.0f, 0.0f, -5.0f));
+    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
+    //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
+    //model = scale(model, vec3(0.05f));
 
     // Set MVP matrix uniforms and render gun
     setMatrices(gunProg);
