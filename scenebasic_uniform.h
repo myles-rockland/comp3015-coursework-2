@@ -76,6 +76,12 @@ public:
     void render();
     void resize(int, int);
     void setMatrices(GLSLProgram& p);
+
+    // New
+    void setSpotlightsIntensity(float intensity);
+    void setSpotlightsInnerCutoff(float degrees);
+    void setSpotlightsOuterCutoff(float degrees);
+    void setupTextures();
 };
 
 #endif // SCENEBASIC_UNIFORM_H

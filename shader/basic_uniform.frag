@@ -20,8 +20,8 @@ uniform struct SpotLightInfo
     vec4 Position;
     vec3 L;
     vec3 Direction;
-    //float InnerCutoff; // InnerCutoff
-    float Cutoff; // OuterCutoff
+    float InnerCutoff; // InnerCutoff
+    float OuterCutoff; // OuterCutoff
 } Spotlights[3];
 
 uniform int Pass;
@@ -71,7 +71,7 @@ float geomSchlickGGX(float dotProd, float roughness)
     return 1.0 / denom; // This should be dotProd / denom, but this saves some computation. Tradeoff between visual accuracy and performance
 }
 
-vec3 fresnelSchlick(float dotProd, vec3 f0) // Fresnel reflection equation
+vec3 fresnelSchlick(float dotProd, vec3 f0) // Fresnel reflection equation for specular component
 {
     return f0 + (1 - f0) * pow(1.0 - dotProd, 5);
 }
@@ -87,17 +87,12 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
     float cosAngle = dot(-s, normalize(Spotlights[lightIndex].Direction));
     float angle = acos(cosAngle);
 
-    if (angle >= 0.0f && angle < Spotlights[lightIndex].Cutoff) // OuterCutoff
+    if (angle >= 0.0f && angle < Spotlights[lightIndex].OuterCutoff) // OuterCutoff
     {
-        // let's say 10 and 15
-        // we have 11
-        // 11 - 10 = 1
-        // 15 - 10 = 5
-        // 1/5 = 0.2
         //float interpolation = (angle - Spotlights[lightIndex].InnerCutoff) / (Spotlights[lightIndex].OuterCutoff - Spotlights[lightIndex].InnerCutoff);
         //float epsilon = cos(Spotlights[lightIndex].OuterCutoff) - cos(Spotlights[lightIndex].InnerCutoff);
         //float intensity = clamp((cosAngle - cos(Spotlights[lightIndex].OuterCutoff)) / epsilon, 0.0, 1.0);
-        lightIntensity = Spotlights[lightIndex].L;
+        lightIntensity = Spotlights[lightIndex].L; //* intensity;
 
         l = Spotlights[lightIndex].Position.xyz - position;
         float dist = length(l);
@@ -105,15 +100,15 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
         lightIntensity /= (dist * dist); // attenuation
     }
 
-    // Get metalness and albedo
+    // Get metalness and albedo for f0
     vec3 f0 = vec3(0.04);
     float metalness = texture(MetalTexture, TexCoord).r;
     vec3 albedo = pow(texture(AlbedoTexture, TexCoord).rgb, vec3(Gamma)); // convert to linear space as albedo is authored in sRGB space
     f0 = mix(f0, albedo.rgb, metalness);
 
-    // Calculate specular component
-    float roughness = max(dot(texture(RoughnessTexture, TexCoord), vec4(1.0)), 0.0); // Transform sample into float representing grey shade. Might need to do 1 - roughness
-    vec3 v = normalize(-position);
+    // Get values for BRDF
+    float roughness = texture(RoughnessTexture, TexCoord).r; // RGB values are the same as they are greyscale, so only one value needed
+    vec3 v = normalize(-position); // This should really be something like camPos - position
     vec3 h = normalize(v + l);
     float nDotH = max(dot(n, h), 0.0); // Ensure non-negative values
     float vDotH = max(dot(v, h), 0.0);
@@ -133,7 +128,7 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
     // diffuse part
     vec3 diffuseComponent = vec3(1.0) - specularComponent;
     diffuseComponent *= 1.0 - metalness;
-    vec3 diffuse = diffuseComponent * (albedo / PI);    
+    vec3 diffuse = diffuseComponent * (albedo / PI); // Lambertian diffuse
     
     // return final radiance
     return (diffuse + specular) * lightIntensity * nDotL;
@@ -144,7 +139,7 @@ vec4 pass1()
 {
     // Calculate normal direction from normal map texture
     vec3 norm = texture(NormalTexture, TexCoord).xyz;
-    norm.xy = 2.0f * norm.xy - 1.0f; // - 1.0f applies to each component in the vector! https://learnwebgl.brown37.net/12_shader_language/glsl_mathematical_operations.html
+    norm.xy = 2.0f * norm.xy - 1.0f;
 
     vec3 Colour = vec3(0.0f, 0.0f, 0.0f);
 
@@ -153,7 +148,6 @@ vec4 pass1()
     {
         for (int i = 0; i < 3; i++)
         {
-            //Colour += blinnphongSpot(normalize(norm), i);
             Colour += microfacetModel(i, Position, normalize(norm));
         }
     }
@@ -161,7 +155,6 @@ vec4 pass1()
     {
         for (int i = 0; i < 3; i++)
         {
-            //Colour += blinnphongSpot(normalize(-norm), i);
             Colour += microfacetModel(i, Position, normalize(-norm));
         }
     }

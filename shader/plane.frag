@@ -25,7 +25,8 @@ uniform struct SpotLightInfo
     vec4 Position;
     vec3 L;
     vec3 Direction;
-    float Cutoff;
+    float InnerCutoff;
+    float OuterCutoff;
 } Spotlights[3];
 
 const float PI = 3.14159265358979323846;
@@ -62,13 +63,8 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
     float cosAngle = dot(-s, normalize(Spotlights[lightIndex].Direction));
     float angle = acos(cosAngle);
 
-    if (angle >= 0.0f && angle < Spotlights[lightIndex].Cutoff) // OuterCutoff
+    if (angle >= 0.0f && angle < Spotlights[lightIndex].OuterCutoff) // OuterCutoff
     {
-        // let's say 10 and 15
-        // we have 11
-        // 11 - 10 = 1
-        // 15 - 10 = 5
-        // 1/5 = 0.2
         //float interpolation = (angle - Spotlights[lightIndex].InnerCutoff) / (Spotlights[lightIndex].OuterCutoff - Spotlights[lightIndex].InnerCutoff);
         //float epsilon = cos(Spotlights[lightIndex].OuterCutoff) - cos(Spotlights[lightIndex].InnerCutoff);
         //float intensity = clamp((cosAngle - cos(Spotlights[lightIndex].OuterCutoff)) / epsilon, 0.0, 1.0);

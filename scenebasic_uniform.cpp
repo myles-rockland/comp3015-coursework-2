@@ -49,76 +49,30 @@ void SceneBasic_Uniform::initScene()
     GLFWwindow* windowContext = glfwGetCurrentContext();
     glfwSetInputMode(windowContext, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST); // Enable depth testing
 
     // Set MVP matrices
     model = mat4(1.0f);
     view = mat4(1.0f);
     projection = mat4(1.0f);
 
-    // Set spotlights ambient diffuse specular uniforms
-    // Gun program
-    gunProg.use();
-    gunProg.setUniform("Spotlights[0].L", vec3(2500.0f)); //0.8, 0, 0
-    gunProg.setUniform("Spotlights[1].L", vec3(2500.0f)); //0, 0.8, 0
-    gunProg.setUniform("Spotlights[2].L", vec3(2500.0f)); //0, 0, 0.8
-    // Plane program
-    planeProg.use();
-    planeProg.setUniform("Spotlights[0].L", vec3(2500.0f)); //0.8, 0, 0
-    planeProg.setUniform("Spotlights[1].L", vec3(2500.0f)); //0, 0.8, 0
-    planeProg.setUniform("Spotlights[2].L", vec3(2500.0f)); //0, 0, 0.8
+    // Set spotlights radiance/intensity uniforms
+    setSpotlightsIntensity(2500.0f);
 
     // Set spotlights cutoff uniforms
-    //for (int i = 0; i < 3; i++)
-    //{
-    //    std::stringstream cutoffName;
-    //    cutoffName << "Spotlights[" << i << "].InnerCutoff"; // InnerCutoff
-    //    gunProg.use();
-    //    gunProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
-    //    planeProg.use();
-    //    planeProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
-    //}
-
-    for (int i = 0; i < 3; i++)
-    {
-        std::stringstream cutoffName;
-        cutoffName << "Spotlights[" << i << "].Cutoff"; // OuterCutoff
-        gunProg.use();
-        gunProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
-        planeProg.use();
-        planeProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
-    }
+    setSpotlightsInnerCutoff(10.0f);
+    setSpotlightsOuterCutoff(15.0f);
 
     // Set misc uniforms
-    gunProg.use();
+    gunProg.use(); // TODO: This shouldn't be in the gun program... this should be in some pbrProg
     gunProg.setUniform("LumThresh", 1.7f);
     gunProg.setUniform("Exposure", 0.35f);
     gunProg.setUniform("White", 0.982f);
     gunProg.setUniform("Gamma", 2.2f);
     gunProg.setUniform("BloomEnabled", bloomEnabled);
 
-    // Load skybox texture
-    GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
-
-    // Load regular textures
-    GLuint albedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
-    GLuint normalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
-    GLuint metallicTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Metallic.png");
-    GLuint roughnessTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Roughness.png");
-
-    // Set active texture unit and bind loaded texture ids to texture buffers
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, albedoTexture);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, normalTexture);
-    glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, metallicTexture);
-    glActiveTexture(GL_TEXTURE6);
-    glBindTexture(GL_TEXTURE_2D, roughnessTexture);
-    
-    // Set texture unit to 0 and bind cubemap
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+    // Setup skybox, gun textures
+    setupTextures();
 
     // Setup FBO
     setupFBO();
@@ -270,38 +224,7 @@ void SceneBasic_Uniform::update( float t )
     if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
     {
         whiteLightsEnabled = !whiteLightsEnabled;
-        if (whiteLightsEnabled)
-        {
-            // Gun program
-            gunProg.use();
-            gunProg.setUniform("Spotlights[0].L", vec3(10.0f)); //0.8, 0, 0
-            gunProg.setUniform("Spotlights[1].L", vec3(10.0f)); //0, 0.8, 0
-            gunProg.setUniform("Spotlights[2].L", vec3(10.0f)); //0, 0, 0.8
-            // Plane program
-            planeProg.use();
-            planeProg.setUniform("Spotlights[0].La", vec3(0.2f)); //0.2, 0, 0
-            planeProg.setUniform("Spotlights[0].L", vec3(1.0f)); //0.8, 0, 0
-            planeProg.setUniform("Spotlights[1].La", vec3(0.2f)); //0, 0.2, 0
-            planeProg.setUniform("Spotlights[1].L", vec3(1.0f)); //0, 0.8, 0
-            planeProg.setUniform("Spotlights[2].La", vec3(0.2f)); //0, 0, 0.2
-            planeProg.setUniform("Spotlights[2].L", vec3(1.0f)); //0, 0, 0.8
-        }
-        else
-        {
-            // Gun program
-            gunProg.use();
-            gunProg.setUniform("Spotlights[0].L", vec3(10.0f, 0.0f, 0.0f)); //0.8, 0, 0
-            gunProg.setUniform("Spotlights[1].L", vec3(0.0f, 10.0f, 0.0f)); //0, 0.8, 0
-            gunProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, 10.0f)); //0, 0, 0.8
-            // Plane program
-            planeProg.use();
-            planeProg.setUniform("Spotlights[0].La", vec3(0.2f, 0.0f, 0.0f)); //0.2, 0, 0
-            planeProg.setUniform("Spotlights[0].L", vec3(0.8f, 0.0f, 0.0f)); //0.8, 0, 0
-            planeProg.setUniform("Spotlights[1].La", vec3(0.0f, 0.2f, 0.0f)); //0, 0.2, 0
-            planeProg.setUniform("Spotlights[1].L", vec3(0.0f, 0.8f, 0.0f)); //0, 0.8, 0
-            planeProg.setUniform("Spotlights[2].La", vec3(0.0f, 0.0f, 0.2f)); //0, 0, 0.2
-            planeProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, 0.8f)); //0, 0, 0.8
-        }
+        setSpotlightsIntensity(2500.0f);
     }
     if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
     {
@@ -508,8 +431,13 @@ void SceneBasic_Uniform::drawScene()
 
     // Set gun model matrix
     model = mat4(1.0f);
-    //model = translate(model, vec3(0.0f, 0.0f, -5.0f));
-    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
+
+    /*model = scale(model, vec3(3.0f)); // Don't need this yet - wait for gamification
+    model = translate(model, cameraPosition);
+    model = translate(model, -1.0f * cameraUp);
+    model = translate(model, 1.0f * normalize(cross(cameraForward, cameraUp)));*/
+
+    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f)); // Really old stuff from CW1
     //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
     //model = scale(model, vec3(0.05f));
 
@@ -533,6 +461,88 @@ void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
     p.setUniform("ModelViewMatrix", mv);
     p.setUniform("MVP", projection * mv);
     p.setUniform("NormalMatrix", glm::mat3(vec3(mv[0]), vec3(mv[1]), vec3(mv[2])));
+}
+
+void SceneBasic_Uniform::setSpotlightsIntensity(float intensity)
+{
+    if (whiteLightsEnabled)
+    {
+        // Gun program
+        gunProg.use();
+        gunProg.setUniform("Spotlights[0].L", vec3(intensity));
+        gunProg.setUniform("Spotlights[1].L", vec3(intensity));
+        gunProg.setUniform("Spotlights[2].L", vec3(intensity));
+        // Plane program
+        planeProg.use();
+        planeProg.setUniform("Spotlights[0].L", vec3(intensity));
+        planeProg.setUniform("Spotlights[1].L", vec3(intensity));
+        planeProg.setUniform("Spotlights[2].L", vec3(intensity));
+    }
+    else
+    {
+        // Gun program
+        gunProg.use();
+        gunProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
+        gunProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
+        gunProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
+        // Plane program
+        planeProg.use();
+        planeProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
+        planeProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
+        planeProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
+    }
+}
+
+void SceneBasic_Uniform::setSpotlightsInnerCutoff(float degrees)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        std::stringstream cutoffName;
+        cutoffName << "Spotlights[" << i << "].InnerCutoff";
+        gunProg.use();
+        gunProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+        planeProg.use();
+        planeProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+    }
+}
+
+void SceneBasic_Uniform::setSpotlightsOuterCutoff(float degrees)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        std::stringstream cutoffName;
+        cutoffName << "Spotlights[" << i << "].OuterCutoff";
+        gunProg.use();
+        gunProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
+        planeProg.use();
+        planeProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
+    }
+}
+
+void SceneBasic_Uniform::setupTextures()
+{
+    // Load skybox texture
+    GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
+
+    // Load regular textures
+    GLuint albedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
+    GLuint normalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
+    GLuint metallicTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Metallic.png");
+    GLuint roughnessTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Roughness.png");
+
+    // Set active texture unit and bind loaded texture ids to texture buffers
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, albedoTexture);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, normalTexture);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, metallicTexture);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, roughnessTexture);
+
+    // Set texture unit to 0 and bind cubemap
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
 }
 
 //sets up the fbo for rendering to a texture
