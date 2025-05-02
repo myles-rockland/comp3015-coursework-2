@@ -6,6 +6,6 @@ layout (binding = 0) uniform samplerCube SkyBoxTex;
 
 void main() {
     vec3 texColour = texture(SkyBoxTex, normalize(Vec)).rgb;
-    texColour = pow(texColour, vec3(1.0f/2.2f)); // Gamma correction
+    //texColour = pow(texColour, vec3(2.2f)); // sRGB -> linear conversion
     FragColor = vec4(texColour, 1.0);
 }

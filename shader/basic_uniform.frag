@@ -36,6 +36,8 @@ uniform float Gamma;
 
 uniform bool BloomEnabled;
 
+uniform vec4 CameraPos;
+
 uniform mat3 rgb2xyz = mat3(
     0.4142564, 0.2126729, 0.0193339,
     0.3575761, 0.7151522, 0.1191920,
@@ -108,7 +110,7 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
 
     // Get values for BRDF
     float roughness = texture(RoughnessTexture, TexCoord).r; // RGB values are the same as they are greyscale, so only one value needed
-    vec3 v = normalize(-position); // This should really be something like camPos - position
+    vec3 v = normalize(CameraPos.xyz - position);
     vec3 h = normalize(v + l);
     float nDotH = max(dot(n, h), 0.0); // Ensure non-negative values
     float vDotH = max(dot(v, h), 0.0);
@@ -122,7 +124,7 @@ vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equat
     
     vec3 specularComponent = fresnel;
     vec3 numerator = normalDistribution * geometry * fresnel;
-    float denominator = 4.0 * max(dot(n, v), 0.0) * max(dot(n, l), 0.0) + 0.0001; // Add epsilon for non-zero denominator
+    float denominator = 4.0 * nDotV * nDotL + 0.0001; // Add epsilon for non-zero denominator
     vec3 specular = numerator / denominator;
 
     // diffuse part
@@ -221,17 +223,17 @@ vec4 pass5()
     vec3 xyzCol = rgb2xyz * vec3(color);
 
     // Convert from XYZ to xyY
-    float xyzSum = xyzCol.x + xyzCol.y + xyzCol.z;
+    float xyzSum = max(xyzCol.x + xyzCol.y + xyzCol.z, 0.00001);
     vec3 xyYCol = vec3(xyzCol.x / xyzSum, xyzCol.y / xyzSum, xyzCol.y);
 
     // Apply the tone mapping operation to the luminance (xyYCol.z or xyzCol.y)
-    float L = (Exposure * xyYCol.z) / 0.5; //float L = (Exposure * xyYCol.z) / AveLum;
+    float L = (Exposure * xyYCol.z) / AveLum;
     L = (L * (1 + L / (White * White))) / (1 + L);
 
     // Using the new luminance, convert back to XYZ
-    xyzCol.x = (L * xyYCol.x) / (xyYCol.y);
+    xyzCol.x = (L * xyYCol.x) / max(xyYCol.y, 0.00001);
     xyzCol.y = L;
-    xyzCol.z = (L * (1 - xyYCol.x - xyYCol.y))/xyYCol.y;
+    xyzCol.z = (L * (1 - xyYCol.x - xyYCol.y))/ max(xyYCol.y, 0.00001);
 
     // Convert back to RGB
     vec4 toneMapColor = vec4(xyz2rgb * xyzCol, 1.0);

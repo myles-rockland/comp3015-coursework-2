@@ -64,7 +64,7 @@ void SceneBasic_Uniform::initScene()
 
     // Set misc uniforms
     gunProg.use(); // TODO: This shouldn't be in the gun program... this should be in some pbrProg
-    gunProg.setUniform("LumThresh", 3.0f);
+    gunProg.setUniform("LumThresh", 3.0f); //1.2f
     gunProg.setUniform("Exposure", 0.35f);
     gunProg.setUniform("White", 0.982f);
     gunProg.setUniform("Gamma", 2.2f);
@@ -292,6 +292,9 @@ void SceneBasic_Uniform::drawScene()
     // Gun rendering
     gunProg.use();
 
+    // Set camera position
+    planeProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
+
     // Set gun model matrix
     model = mat4(1.0f);
 
@@ -363,9 +366,9 @@ void SceneBasic_Uniform::setSpotlightsInnerCutoff(float degrees)
         std::stringstream cutoffName;
         cutoffName << "Spotlights[" << i << "].InnerCutoff";
         gunProg.use();
-        gunProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+        gunProg.setUniform(cutoffName.str().c_str(), radians(degrees));
         planeProg.use();
-        planeProg.setUniform(cutoffName.str().c_str(), radians(10.0f));
+        planeProg.setUniform(cutoffName.str().c_str(), radians(degrees));
     }
 }
 
@@ -376,9 +379,9 @@ void SceneBasic_Uniform::setSpotlightsOuterCutoff(float degrees)
         std::stringstream cutoffName;
         cutoffName << "Spotlights[" << i << "].OuterCutoff";
         gunProg.use();
-        gunProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
+        gunProg.setUniform(cutoffName.str().c_str(), radians(degrees));
         planeProg.use();
-        planeProg.setUniform(cutoffName.str().c_str(), radians(15.0f));
+        planeProg.setUniform(cutoffName.str().c_str(), radians(degrees));
     }
 }
 
@@ -498,7 +501,7 @@ void SceneBasic_Uniform::setupFullscreenQuad()
 void SceneBasic_Uniform::computeWeights()
 {
     // Compute and sum the weights for bloom
-    float weights[10], sum, sigma2 = 25.0f;
+    float weights[10], sum, sigma2 = 9.0f; // 25.0f
     weights[0] = gauss(0, sigma2);
     sum = weights[0];
     for (int i = 1; i < 10; i++) {
@@ -654,6 +657,7 @@ void SceneBasic_Uniform::computeLogAveLuminance()
     for (int i = 0; i < size; i++)
     {
         float lum = dot(vec3(texData[i * 3 + 0], texData[i * 3 + 1], texData[i * 3 + 2]), vec3(0.2126f, 0.7152f, 0.0722f));
+        if (!std::isfinite(lum)) continue;
         sum += logf(lum + 0.00001f);
     }
     gunProg.use();
