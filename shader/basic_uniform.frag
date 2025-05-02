@@ -20,8 +20,8 @@ uniform struct SpotLightInfo
     vec4 Position;
     vec3 L;
     vec3 Direction;
-    float InnerCutoff; // InnerCutoff
-    float OuterCutoff; // OuterCutoff
+    float InnerCutoff;
+    float OuterCutoff;
 } Spotlights[3];
 
 uniform int Pass;

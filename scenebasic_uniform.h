@@ -5,6 +5,8 @@
 
 #include <glad/glad.h>
 #include "helper/glslprogram.h"
+#include "GLFW/glfw3.h"
+
 // GLM
 #include "glm/glm.hpp"
 #include <glm/gtc/matrix_transform.hpp>
@@ -68,6 +70,19 @@ private:
     void drawScene();
     float gauss(float, float);
 
+    // New
+    void setSpotlightsIntensity(float intensity);
+    void setSpotlightsInnerCutoff(float degrees);
+    void setSpotlightsOuterCutoff(float degrees);
+    void setupTextures();
+    void setupFullscreenQuad();
+    void computeWeights();
+    void setupSamplers();
+
+    void handleKeyboardInput(GLFWwindow* windowContext, float deltaTime);
+    void handleMouseMovement(GLFWwindow* windowContext, float deltaTime);
+    void handleMouseClicks(GLFWwindow* windowContext);
+
 public:
     SceneBasic_Uniform();
 
@@ -76,12 +91,6 @@ public:
     void render();
     void resize(int, int);
     void setMatrices(GLSLProgram& p);
-
-    // New
-    void setSpotlightsIntensity(float intensity);
-    void setSpotlightsInnerCutoff(float degrees);
-    void setSpotlightsOuterCutoff(float degrees);
-    void setupTextures();
 };
 
 #endif // SCENEBASIC_UNIFORM_H

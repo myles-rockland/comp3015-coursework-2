@@ -14,7 +14,6 @@ using std::endl;
 #include "helper/glutils.h"
 #include "helper/texture.h"
 
-#include "GLFW/glfw3.h"
 #include "glad/glad.h"
 
 using namespace glm;
@@ -65,7 +64,7 @@ void SceneBasic_Uniform::initScene()
 
     // Set misc uniforms
     gunProg.use(); // TODO: This shouldn't be in the gun program... this should be in some pbrProg
-    gunProg.setUniform("LumThresh", 1.7f);
+    gunProg.setUniform("LumThresh", 3.0f);
     gunProg.setUniform("Exposure", 0.35f);
     gunProg.setUniform("White", 0.982f);
     gunProg.setUniform("Gamma", 2.2f);
@@ -77,79 +76,14 @@ void SceneBasic_Uniform::initScene()
     // Setup FBO
     setupFBO();
 
-    // Array for full-screen quad
-    GLfloat verts[] = {
-    -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-    -1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f
-    };
+    // Setup full screen quad for HDR and Bloom
+    setupFullscreenQuad();
 
-    GLfloat tc[] = {
-    0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f
-    };
-
-    // Set up the buffers
-    unsigned int handle[2];
-    glGenBuffers(2, handle);
-    glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
-    glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), verts, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
-    glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), tc, GL_STATIC_DRAW);
-
-    // Set up the vertex array object
-    glGenVertexArrays(1, &fsQuad);
-    glBindVertexArray(fsQuad);
-    glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
-    glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0); // Vertex position
-    glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
-    glVertexAttribPointer((GLuint)2, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2); // Texture coordinates
-    glBindVertexArray(0);
-
-    // Compute and sum the weights
-    float weights[10], sum, sigma2 = 25.0f;
-    weights[0] = gauss(0, sigma2);
-    sum = weights[0];
-    for (int i = 1; i < 10; i++) {
-        weights[i] = gauss(float(i), sigma2);
-        sum += 2 * weights[i];
-    }
-
-    // Normalize the weights and set the uniform
-    for (int i = 0; i < 10; i++) {
-        std::stringstream uniName;
-        uniName << "Weight[" << i << "]";
-        float val = weights[i] / sum;
-        gunProg.use();
-        gunProg.setUniform(uniName.str().c_str(), val);
-    }
+    // Compute weights and set uniforms for bloom blurring
+    computeWeights();
 
     // Set up two sampler objects for linear and nearest filtering
-    GLuint samplers[2];
-    glGenSamplers(2, samplers);
-    linearSampler = samplers[0];
-    nearestSampler = samplers[1];
-    GLfloat border[] = { 0.0f,0.0f,0.0f,0.0f };
-
-    // Set up the nearest sampler
-    glSamplerParameteri(nearestSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glSamplerParameteri(nearestSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glSamplerParameteri(nearestSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(nearestSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(nearestSampler, GL_TEXTURE_BORDER_COLOR, border);
-
-    // Set up the linear sampler
-    glSamplerParameteri(linearSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(linearSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(linearSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(linearSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(linearSampler, GL_TEXTURE_BORDER_COLOR, border);
-
-    // We want nearest sampling except for the last pass.
-    glBindSampler(0, nearestSampler);
-    glBindSampler(1, nearestSampler);
-    glBindSampler(2, nearestSampler);
+    setupSamplers();
 }
 
 void SceneBasic_Uniform::compile()
@@ -195,87 +129,16 @@ void SceneBasic_Uniform::update( float t )
         angle -= two_pi<float>();
     }
 
-    // Get keyboard input
+    // Get current window context
     GLFWwindow* windowContext = glfwGetCurrentContext();
-    if (glfwGetKey(windowContext, GLFW_KEY_W) == GLFW_PRESS) // Move forwards
-    {
-        cameraPosition += cameraSpeed * deltaT * cameraForward;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_S) == GLFW_PRESS) // Move backwards
-    {
-        cameraPosition -= cameraSpeed * deltaT * cameraForward;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_A) == GLFW_PRESS) // Move left
-    {
-        cameraPosition -= normalize(cross(cameraForward, cameraUp)) * cameraSpeed * deltaT;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_D) == GLFW_PRESS) // Move right
-    {
-        cameraPosition += normalize(cross(cameraForward, cameraUp)) * cameraSpeed * deltaT;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_SPACE) == GLFW_PRESS) // Move up
-    {
-        cameraPosition += cameraUp * cameraSpeed * deltaT;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) // Move down
-    {
-        cameraPosition -= cameraUp * cameraSpeed * deltaT;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
-    {
-        whiteLightsEnabled = !whiteLightsEnabled;
-        setSpotlightsIntensity(2500.0f);
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
-    {
-        bloomEnabled = !bloomEnabled;
-        gunProg.use();
-        gunProg.setUniform("BloomEnabled", bloomEnabled);
-    }
 
-    // Get cursor position for camera movement
-    double xpos = 0.0, ypos = 0.0;
-    glfwGetCursorPos(windowContext, &xpos, &ypos);
-    //Initially no last positions, so sets last positions to current positions
-    if (mouseFirstEntry)
-    {
-        lastXPos = (float)xpos;
-        lastYPos = (float)ypos;
-        mouseFirstEntry = false;
-    }
+    // Handle keyboard input
+    handleKeyboardInput(windowContext, deltaT);
 
-    //Sets values for change in position since last frame to current frame
-    float xOffset = (float)xpos - lastXPos;
-    float yOffset = lastYPos - (float)ypos;
+    // Handle mouse input
+    handleMouseMovement(windowContext, deltaT);
+    handleMouseClicks(windowContext);
 
-    //Sets last positions to current positions for next frame
-    lastXPos = (float)xpos;
-    lastYPos = (float)ypos;
-
-    //Moderates the change in position based on sensitivity value
-    xOffset *= cameraSensitivity;
-    yOffset *= cameraSensitivity;
-
-    //Adjusts yaw & pitch values against changes in positions
-    cameraYaw += xOffset;
-    cameraPitch += yOffset;
-
-    //Prevents turning up & down beyond 90 degrees to look backwards
-    if (cameraPitch > 89.0f)
-    {
-        cameraPitch = 89.0f;
-    }
-    else if (cameraPitch < -89.0f)
-    {
-        cameraPitch = -89.0f;
-    }
-
-    //Modification of direction vector based on mouse turning
-    vec3 direction;
-    direction.x = cos(radians(cameraYaw)) * cos(radians(cameraPitch));
-    direction.y = sin(radians(cameraPitch));
-    direction.z = sin(radians(cameraYaw)) * cos(radians(cameraPitch));
-    cameraForward = normalize(direction);
 }
 
 void SceneBasic_Uniform::render()
@@ -545,7 +408,6 @@ void SceneBasic_Uniform::setupTextures()
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
 }
 
-//sets up the fbo for rendering to a texture
 void SceneBasic_Uniform::setupFBO() {
     // Generate and bind the framebuffer
     glGenFramebuffers(1, &hdrFbo);
@@ -581,12 +443,14 @@ void SceneBasic_Uniform::setupFBO() {
     // and the two-pass blur
     bloomBufWidth = width / 8;
     bloomBufHeight = height / 8;
+
     glGenTextures(1, &tex1);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, tex1);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, bloomBufWidth, bloomBufHeight);
-    glActiveTexture(GL_TEXTURE2);
+
     glGenTextures(1, &tex2);
+    glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, tex2);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, bloomBufWidth, bloomBufHeight);
 
@@ -596,6 +460,187 @@ void SceneBasic_Uniform::setupFBO() {
 
     // Unbind the framebuffer, and revert to default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void SceneBasic_Uniform::setupFullscreenQuad()
+{
+    // Array for full-screen quad
+    GLfloat verts[] = {
+    -1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+    -1.0f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f
+    };
+
+    GLfloat tc[] = {
+    0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+    0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f
+    };
+
+    // Set up the buffers
+    unsigned int handle[2];
+    glGenBuffers(2, handle);
+    glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 3 * sizeof(float), verts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), tc, GL_STATIC_DRAW);
+
+    // Set up the vertex array object
+    glGenVertexArrays(1, &fsQuad);
+    glBindVertexArray(fsQuad);
+    glBindBuffer(GL_ARRAY_BUFFER, handle[0]);
+    glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0); // Vertex position
+    glBindBuffer(GL_ARRAY_BUFFER, handle[1]);
+    glVertexAttribPointer((GLuint)2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2); // Texture coordinates
+    glBindVertexArray(0);
+}
+
+void SceneBasic_Uniform::computeWeights()
+{
+    // Compute and sum the weights for bloom
+    float weights[10], sum, sigma2 = 25.0f;
+    weights[0] = gauss(0, sigma2);
+    sum = weights[0];
+    for (int i = 1; i < 10; i++) {
+        weights[i] = gauss(float(i), sigma2);
+        sum += 2 * weights[i];
+    }
+
+    // Normalize the weights and set the uniform
+    for (int i = 0; i < 10; i++) {
+        std::stringstream uniName;
+        uniName << "Weight[" << i << "]";
+        float val = weights[i] / sum;
+        gunProg.use();
+        gunProg.setUniform(uniName.str().c_str(), val);
+    }
+}
+
+void SceneBasic_Uniform::setupSamplers()
+{
+    // Set up two sampler objects for linear and nearest filtering
+    GLuint samplers[2];
+    glGenSamplers(2, samplers);
+    linearSampler = samplers[0];
+    nearestSampler = samplers[1];
+    GLfloat border[] = { 0.0f,0.0f,0.0f,0.0f };
+
+    // Set up the nearest sampler
+    glSamplerParameteri(nearestSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glSamplerParameteri(nearestSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glSamplerParameteri(nearestSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(nearestSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glSamplerParameterfv(nearestSampler, GL_TEXTURE_BORDER_COLOR, border);
+
+    // Set up the linear sampler
+    glSamplerParameteri(linearSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(linearSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(linearSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(linearSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glSamplerParameterfv(linearSampler, GL_TEXTURE_BORDER_COLOR, border);
+
+    // We want nearest sampling except for the last pass.
+    glBindSampler(0, nearestSampler);
+    glBindSampler(1, nearestSampler);
+    glBindSampler(2, nearestSampler);
+}
+
+void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float deltaTime)
+{
+    if (glfwGetKey(windowContext, GLFW_KEY_W) == GLFW_PRESS) // Move forwards
+    {
+        cameraPosition += cameraSpeed * deltaTime * cameraForward;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_S) == GLFW_PRESS) // Move backwards
+    {
+        cameraPosition -= cameraSpeed * deltaTime * cameraForward;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_A) == GLFW_PRESS) // Move left
+    {
+        cameraPosition -= normalize(cross(cameraForward, cameraUp)) * cameraSpeed * deltaTime;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_D) == GLFW_PRESS) // Move right
+    {
+        cameraPosition += normalize(cross(cameraForward, cameraUp)) * cameraSpeed * deltaTime;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_SPACE) == GLFW_PRESS) // Move up
+    {
+        cameraPosition += cameraUp * cameraSpeed * deltaTime;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) // Move down
+    {
+        cameraPosition -= cameraUp * cameraSpeed * deltaTime;
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
+    {
+        whiteLightsEnabled = !whiteLightsEnabled;
+        setSpotlightsIntensity(2500.0f);
+    }
+    if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
+    {
+        bloomEnabled = !bloomEnabled;
+        gunProg.use();
+        gunProg.setUniform("BloomEnabled", bloomEnabled);
+    }
+}
+
+void SceneBasic_Uniform::handleMouseMovement(GLFWwindow* windowContext, float deltaTime)
+{
+    // Get cursor position for camera movement
+    double xpos = 0.0, ypos = 0.0;
+    glfwGetCursorPos(windowContext, &xpos, &ypos);
+    //Initially no last positions, so sets last positions to current positions
+    if (mouseFirstEntry)
+    {
+        lastXPos = (float)xpos;
+        lastYPos = (float)ypos;
+        mouseFirstEntry = false;
+    }
+
+    //Sets values for change in position since last frame to current frame
+    float xOffset = (float)xpos - lastXPos;
+    float yOffset = lastYPos - (float)ypos;
+
+    //Sets last positions to current positions for next frame
+    lastXPos = (float)xpos;
+    lastYPos = (float)ypos;
+
+    //Moderates the change in position based on sensitivity value
+    xOffset *= cameraSensitivity;
+    yOffset *= cameraSensitivity;
+
+    //Adjusts yaw & pitch values against changes in positions
+    cameraYaw += xOffset;
+    cameraPitch += yOffset;
+
+    //Prevents turning up & down beyond 90 degrees to look backwards
+    if (cameraPitch > 89.0f)
+    {
+        cameraPitch = 89.0f;
+    }
+    else if (cameraPitch < -89.0f)
+    {
+        cameraPitch = -89.0f;
+    }
+
+    //Modification of direction vector based on mouse turning
+    vec3 direction;
+    direction.x = cos(radians(cameraYaw)) * cos(radians(cameraPitch));
+    direction.y = sin(radians(cameraPitch));
+    direction.z = sin(radians(cameraYaw)) * cos(radians(cameraPitch));
+    cameraForward = normalize(direction);
+}
+
+void SceneBasic_Uniform::handleMouseClicks(GLFWwindow* windowContext)
+{
+    if (glfwGetMouseButton(windowContext, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
+        // Shoot bullet
+    }
+    if (glfwGetMouseButton(windowContext, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+    {
+        // Turn on ultraviolet light
+    }
 }
 
 void SceneBasic_Uniform::computeLogAveLuminance()
