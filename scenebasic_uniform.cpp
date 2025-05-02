@@ -63,12 +63,15 @@ void SceneBasic_Uniform::initScene()
     setSpotlightsOuterCutoff(15.0f);
 
     // Set misc uniforms
-    gunProg.use(); // TODO: This shouldn't be in the gun program... this should be in some pbrProg
-    gunProg.setUniform("LumThresh", 3.0f); //1.2f
-    gunProg.setUniform("Exposure", 0.35f);
-    gunProg.setUniform("White", 0.982f);
-    gunProg.setUniform("Gamma", 2.2f);
-    gunProg.setUniform("BloomEnabled", bloomEnabled);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("LumThresh", 3.0f);
+    hdrBloomProg.setUniform("Exposure", 0.35f);
+    hdrBloomProg.setUniform("White", 0.982f);
+    hdrBloomProg.setUniform("Gamma", 2.2f);
+    hdrBloomProg.setUniform("BloomEnabled", bloomEnabled);
+
+    pbrProg.use();
+    pbrProg.setUniform("Gamma", 2.2f);
 
     // Setup skybox, gun textures
     setupTextures();
@@ -90,23 +93,24 @@ void SceneBasic_Uniform::compile()
 {
 	try {
         // Compile Shaders
-        // Gun shader
-        gunProg.compileShader("shader/basic_uniform.vert");
-        gunProg.compileShader("shader/basic_uniform.frag");
         // Skybox shader
         skyboxProg.compileShader("shader/skybox.vert");
         skyboxProg.compileShader("shader/skybox.frag");
-        // Plane shader
-        planeProg.compileShader("shader/plane.vert");
-        planeProg.compileShader("shader/plane.frag");
+        // PBR shader
+        pbrProg.compileShader("shader/pbr.vert");
+        pbrProg.compileShader("shader/pbr.frag");
+        // HDR + Bloom shader
+        hdrBloomProg.compileShader("shader/hdrBloom.vert");
+        hdrBloomProg.compileShader("shader/hdrBloom.frag");
+        
 
         // Link Shaders
-        gunProg.link();
         skyboxProg.link();
-        planeProg.link();
+        pbrProg.link();
+        hdrBloomProg.link();
 
-        // Use gun shader to begin
-        gunProg.use();
+        // Use pbr shader to begin
+        pbrProg.use();
 	} catch (GLSLProgramException &e) {
 		cerr << e.what() << endl;
 		exit(EXIT_FAILURE);
@@ -153,8 +157,8 @@ void SceneBasic_Uniform::render()
 
 void SceneBasic_Uniform::pass1() // Draw the scene normally
 {
-    gunProg.use();
-    gunProg.setUniform("Pass", 1);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 1);
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
     glViewport(0, 0, width, height);
     glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
@@ -169,8 +173,8 @@ void SceneBasic_Uniform::pass1() // Draw the scene normally
 
 void SceneBasic_Uniform::pass2() // Draw the blur
 {
-    gunProg.use();
-    gunProg.setUniform("Pass", 2);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 2);
     glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
@@ -185,7 +189,7 @@ void SceneBasic_Uniform::pass2() // Draw the blur
     view = mat4(1.0f);
     projection = mat4(1.0f);
 
-    setMatrices(gunProg);
+    setMatrices(hdrBloomProg);
 
     glBindVertexArray(fsQuad);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -194,8 +198,8 @@ void SceneBasic_Uniform::pass2() // Draw the blur
 
 void SceneBasic_Uniform::pass3()
 {
-    gunProg.use();
-    gunProg.setUniform("Pass", 3);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 3);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex2, 0);
 
@@ -205,8 +209,8 @@ void SceneBasic_Uniform::pass3()
 
 void SceneBasic_Uniform::pass4()
 {
-    gunProg.use();
-    gunProg.setUniform("Pass", 4);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 4);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
 
@@ -216,8 +220,8 @@ void SceneBasic_Uniform::pass4()
 
 void SceneBasic_Uniform::pass5()
 {
-    gunProg.use();
-    gunProg.setUniform("Pass", 5);
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 5);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -236,7 +240,9 @@ void SceneBasic_Uniform::drawScene()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Set normal matrix using view
-    mat3 normalMatrix = mat3(vec3(view[0]), vec3(view[1]), vec3(view[2]));
+    model = mat4(1.0f);
+    mat4 mv = view * model;
+    mat3 normalMatrix = mat3(transpose(inverse(mv))); //mat3 normalMatrix = mat3(vec3(view[0]), vec3(view[1]), vec3(view[2]));
 
     // Set spotlight uniforms
     for (int i = 0; i < 3; i++)
@@ -247,18 +253,15 @@ void SceneBasic_Uniform::drawScene()
         float x = 50.0f * sin(angle + (two_pi<float>() / 3) * i);
         float z = 50.0f * cos(angle + (two_pi<float>() / 3) * i);
         vec4 lightPos = vec4(x, 15.0f, z, 1.0f);
-        gunProg.use();
-        gunProg.setUniform(positionName.str().c_str(), view * lightPos);
-        planeProg.use();
-        planeProg.setUniform(positionName.str().c_str(), view * lightPos);
+        pbrProg.use();
+        pbrProg.setUniform(positionName.str().c_str(), view * lightPos);
 
         // Direction
         std::stringstream directionName;
         directionName << "Spotlights[" << i << "].Direction";
-        gunProg.use();
-        gunProg.setUniform(directionName.str().c_str(), normalMatrix * vec3(-lightPos.x, -lightPos.y, -lightPos.z)); // -lightPos.x, y and z
-        planeProg.use();
-        planeProg.setUniform(directionName.str().c_str(), normalMatrix * vec3(-lightPos.x, -lightPos.y, -lightPos.z)); // -lightPos.x, y and z
+        pbrProg.use();
+        //pbrProg.setUniform(directionName.str().c_str(), normalMatrix * vec3(-lightPos.x, -lightPos.y, -lightPos.z)); // -lightPos.x, y and z
+        pbrProg.setUniform(directionName.str().c_str(), vec3(view * vec4(-lightPos.x, -lightPos.y, -lightPos.z, 0.0f))); // I think this should be in view space...
     }
 
     // Skybox rendering
@@ -273,27 +276,25 @@ void SceneBasic_Uniform::drawScene()
     view = lookAt(cameraPosition, cameraPosition + cameraForward, cameraUp); // Back to normal
 
     // Plane rendering
-    planeProg.use();
+    pbrProg.use();
 
-    // Set plane material uniforms
-    planeProg.setUniform("Material.Albedo", vec3(0.5f));
-    planeProg.setUniform("Material.Metallic", 0.0f);
-    planeProg.setUniform("Material.Roughness", 0.5f);
-    planeProg.setUniform("Material.AO", 1.0f);
+    // Set camera position
+    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
 
     // Set plane model matrix
     model = mat4(1.0f);
     model = translate(model, vec3(0.0f, -10.0f, 0.0f));
 
-    // Set MVP matrix uniforms and render plane
-    setMatrices(planeProg);
+    // Bind default, set MVP matrix uniforms and render plane
+    bindPbrTextures(defaultAlbedoTexture, defaultNormalTexture, defaultMetallicTexture, defaultRoughnessTexture, defaultAOTexture);
+    setMatrices(pbrProg);
     plane.render();
 
     // Gun rendering
-    gunProg.use();
+    pbrProg.use();
 
     // Set camera position
-    planeProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
+    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
 
     // Set gun model matrix
     model = mat4(1.0f);
@@ -307,8 +308,9 @@ void SceneBasic_Uniform::drawScene()
     //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
     //model = scale(model, vec3(0.05f));
 
-    // Set MVP matrix uniforms and render gun
-    setMatrices(gunProg);
+    // Bind gun textures, set MVP matrix uniforms and render gun
+    bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
+    setMatrices(pbrProg);
     gun->render();
 }
 
@@ -326,7 +328,7 @@ void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
     p.setUniform("ModelMatrix", model);
     p.setUniform("ModelViewMatrix", mv);
     p.setUniform("MVP", projection * mv);
-    p.setUniform("NormalMatrix", glm::mat3(vec3(mv[0]), vec3(mv[1]), vec3(mv[2])));
+    p.setUniform("NormalMatrix", transpose(inverse(mat3(vec3(mv[0]), vec3(mv[1]), vec3(mv[2])))));
 }
 
 void SceneBasic_Uniform::setSpotlightsIntensity(float intensity)
@@ -334,28 +336,18 @@ void SceneBasic_Uniform::setSpotlightsIntensity(float intensity)
     if (whiteLightsEnabled)
     {
         // Gun program
-        gunProg.use();
-        gunProg.setUniform("Spotlights[0].L", vec3(intensity));
-        gunProg.setUniform("Spotlights[1].L", vec3(intensity));
-        gunProg.setUniform("Spotlights[2].L", vec3(intensity));
-        // Plane program
-        planeProg.use();
-        planeProg.setUniform("Spotlights[0].L", vec3(intensity));
-        planeProg.setUniform("Spotlights[1].L", vec3(intensity));
-        planeProg.setUniform("Spotlights[2].L", vec3(intensity));
+        pbrProg.use();
+        pbrProg.setUniform("Spotlights[0].L", vec3(intensity));
+        pbrProg.setUniform("Spotlights[1].L", vec3(intensity));
+        pbrProg.setUniform("Spotlights[2].L", vec3(intensity));
     }
     else
     {
         // Gun program
-        gunProg.use();
-        gunProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
-        gunProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
-        gunProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
-        // Plane program
-        planeProg.use();
-        planeProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
-        planeProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
-        planeProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
+        pbrProg.use();
+        pbrProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
+        pbrProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
+        pbrProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
     }
 }
 
@@ -365,10 +357,8 @@ void SceneBasic_Uniform::setSpotlightsInnerCutoff(float degrees)
     {
         std::stringstream cutoffName;
         cutoffName << "Spotlights[" << i << "].InnerCutoff";
-        gunProg.use();
-        gunProg.setUniform(cutoffName.str().c_str(), radians(degrees));
-        planeProg.use();
-        planeProg.setUniform(cutoffName.str().c_str(), radians(degrees));
+        pbrProg.use();
+        pbrProg.setUniform(cutoffName.str().c_str(), radians(degrees));
     }
 }
 
@@ -378,10 +368,8 @@ void SceneBasic_Uniform::setSpotlightsOuterCutoff(float degrees)
     {
         std::stringstream cutoffName;
         cutoffName << "Spotlights[" << i << "].OuterCutoff";
-        gunProg.use();
-        gunProg.setUniform(cutoffName.str().c_str(), radians(degrees));
-        planeProg.use();
-        planeProg.setUniform(cutoffName.str().c_str(), radians(degrees));
+        pbrProg.use();
+        pbrProg.setUniform(cutoffName.str().c_str(), radians(degrees));
     }
 }
 
@@ -390,25 +378,40 @@ void SceneBasic_Uniform::setupTextures()
     // Load skybox texture
     GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
 
-    // Load regular textures
-    GLuint albedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
-    GLuint normalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
-    GLuint metallicTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Metallic.png");
-    GLuint roughnessTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Roughness.png");
+    // Load gun textures
+    gunAlbedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
+    gunNormalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
+    gunMetallicTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Metallic.png");
+    gunRoughnessTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Roughness.png");
+    gunAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
 
-    // Set active texture unit and bind loaded texture ids to texture buffers
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, albedoTexture);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, normalTexture);
-    glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, metallicTexture);
-    glActiveTexture(GL_TEXTURE6);
-    glBindTexture(GL_TEXTURE_2D, roughnessTexture);
+    // Load default textures
+    defaultAlbedoTexture = Texture::loadTexture("media/textures/grey_1x1.png");
+    defaultNormalTexture = Texture::loadTexture("media/textures/normal_up_1x1.png");
+    defaultMetallicTexture = Texture::loadTexture("media/textures/black_1x1.png");
+    defaultRoughnessTexture = Texture::loadTexture("media/textures/white_1x1.png");
+    defaultAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
+
+    // Set active texture unit and bind loaded texture ids to 2D texture buffer
+    bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
 
     // Set texture unit to 0 and bind cubemap
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+}
+
+void SceneBasic_Uniform::bindPbrTextures(GLuint albedo, GLuint normal, GLuint metallic, GLuint roughness, GLuint ao)
+{
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, albedo);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, normal);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, metallic);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, roughness);
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, ao);
 }
 
 void SceneBasic_Uniform::setupFBO() {
@@ -514,8 +517,8 @@ void SceneBasic_Uniform::computeWeights()
         std::stringstream uniName;
         uniName << "Weight[" << i << "]";
         float val = weights[i] / sum;
-        gunProg.use();
-        gunProg.setUniform(uniName.str().c_str(), val);
+        hdrBloomProg.use();
+        hdrBloomProg.setUniform(uniName.str().c_str(), val);
     }
 }
 
@@ -582,8 +585,8 @@ void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float de
     if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
     {
         bloomEnabled = !bloomEnabled;
-        gunProg.use();
-        gunProg.setUniform("BloomEnabled", bloomEnabled);
+        hdrBloomProg.use();
+        hdrBloomProg.setUniform("BloomEnabled", bloomEnabled);
     }
 }
 
@@ -660,8 +663,8 @@ void SceneBasic_Uniform::computeLogAveLuminance()
         if (!std::isfinite(lum)) continue;
         sum += logf(lum + 0.00001f);
     }
-    gunProg.use();
-    gunProg.setUniform("AveLum", expf(sum / size));
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("AveLum", expf(sum / size));
 }
 
 float SceneBasic_Uniform::gauss(float x, float sigma2)

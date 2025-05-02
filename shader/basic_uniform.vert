@@ -9,7 +9,7 @@ layout (location = 3) in vec4 VertexTangent;
 // Out variables
 out vec3 ViewDir;
 out vec2 TexCoord;
-out vec3 Position;
+out vec3 FragPos;
 
 uniform mat4 ModelViewMatrix;
 uniform mat3 NormalMatrix;
@@ -21,7 +21,7 @@ void main()
     vec3 normal = normalize(NormalMatrix * VertexNormal);
     vec3 tangent = normalize(NormalMatrix * vec3(VertexTangent));
     vec3 binormal = normalize(cross(normal, tangent)) * VertexTangent.w; // Compute binormal
-    Position = (ModelViewMatrix * vec4(VertexPosition, 1.0f)).xyz;
+    FragPos = (ModelViewMatrix * vec4(VertexPosition, 1.0f)).xyz;
 
     // Set matrix for transformation to tangent space
     mat3 toObjectLocal = mat3(
@@ -31,7 +31,7 @@ void main()
     );
 
     // Get light direction and view direction in tangent space
-    ViewDir = toObjectLocal * normalize(-Position);
+    ViewDir = toObjectLocal * normalize(-FragPos);
 
     // Set TexCoord and gl_Position for next stage in pipeline (fragment shader)
     TexCoord = VertexTexCoord;

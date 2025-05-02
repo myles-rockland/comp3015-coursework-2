@@ -21,17 +21,12 @@
 class SceneBasic_Uniform : public Scene
 {
 private:
-    GLSLProgram gunProg;
-    GLSLProgram planeProg;
-    GLSLProgram skyboxProg;
+    GLSLProgram hdrBloomProg, pbrProg, skyboxProg;
     glm::mat4 rotationMatrix;
 
     std::unique_ptr<ObjMesh> gun;
     Plane plane;
     SkyBox skybox;
-    //Torus torus;
-    //Teapot teapot;
-    //Cube cube;
 
     GLuint fsQuad, hdrFbo, blurFbo, hdrTex, tex1, tex2;
     GLuint linearSampler, nearestSampler;
@@ -59,6 +54,20 @@ private:
     float lastXPos;
     float lastYPos;
 
+    // Gun textures
+    GLuint gunAlbedoTexture;
+    GLuint gunNormalTexture;
+    GLuint gunMetallicTexture;
+    GLuint gunRoughnessTexture;
+    GLuint gunAOTexture;
+
+    // Default textures
+    GLuint defaultAlbedoTexture;
+    GLuint defaultNormalTexture;
+    GLuint defaultMetallicTexture;
+    GLuint defaultRoughnessTexture;
+    GLuint defaultAOTexture;
+
     void compile();
     void setupFBO();
     void pass1();
@@ -75,6 +84,7 @@ private:
     void setSpotlightsInnerCutoff(float degrees);
     void setSpotlightsOuterCutoff(float degrees);
     void setupTextures();
+    void bindPbrTextures(GLuint albedo, GLuint normal, GLuint metallic, GLuint roughness, GLuint ao);
     void setupFullscreenQuad();
     void computeWeights();
     void setupSamplers();
