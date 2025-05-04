@@ -11,18 +11,18 @@ out vec2 TexCoord;
 
 out vec3 TangentFragPos;
 out vec3 TangentCameraPos;
-out vec3 TangentSpotlightsPos[3];
-out vec3 TangentSpotlightsDir[3];
+out vec3 TangentSpotlightPos;
+out vec3 TangentSpotlightDir;
 
 // Uniforms
 uniform struct SpotLightInfo
 {
     vec4 Position;
-    vec3 L;
     vec3 Direction;
+    vec3 L;
     float InnerCutoff;
     float OuterCutoff;
-} Spotlights[3];
+} Spotlight;
 
 uniform mat4 ModelViewMatrix;
 uniform mat3 NormalMatrix;
@@ -47,11 +47,8 @@ void main()
     TangentFragPos = TBN * (ModelViewMatrix * vec4(VertexPosition, 1.0f)).xyz;
 
     // Set spotlight positions in tangent space
-    for(int i = 0; i < 3; i++)
-    {
-        TangentSpotlightsPos[i] = TBN * Spotlights[i].Position.xyz;
-        TangentSpotlightsDir[i] = TBN * Spotlights[i].Direction;
-    }
+    TangentSpotlightPos = TBN * Spotlight.Position.xyz;
+    TangentSpotlightDir = TBN * Spotlight.Direction;
 
     // Set TexCoord and gl_Position for next stage in pipeline (fragment shader)
     TexCoord = VertexTexCoord;

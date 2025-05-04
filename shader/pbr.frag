@@ -4,8 +4,8 @@ in vec2 TexCoord;
 
 in vec3 TangentFragPos;
 in vec3 TangentCameraPos;
-in vec3 TangentSpotlightsPos[3];
-in vec3 TangentSpotlightsDir[3];
+in vec3 TangentSpotlightPos;
+in vec3 TangentSpotlightDir;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -22,11 +22,11 @@ layout (binding = 0) uniform sampler2D HdrTex;
 uniform struct SpotLightInfo
 {
     vec4 Position;
-    vec3 L;
     vec3 Direction;
+    vec3 L;
     float InnerCutoff;
     float OuterCutoff;
-} Spotlights[3];
+} Spotlight;
 
 uniform float Gamma;
 
@@ -58,25 +58,25 @@ vec3 fresnelSchlick(float dotProd, vec3 f0) // Fresnel reflection equation for s
     return f0 + (1 - f0) * pow(1.0 - dotProd, 5);
 }
 
-vec3 microfacetModel(int lightIndex, vec3 position, vec3 n) // Reflectance Equation
+vec3 microfacetModel(vec3 position, vec3 n) // Reflectance Equation
 { 
     // lights in reflectance
     vec3 l = vec3(0.0); // Direction towards light
     vec3 lightIntensity = vec3(0.0); // AKA Radiance/Strength/Magnitude/Colour
 
-    vec3 s = normalize(TangentSpotlightsPos[lightIndex] - position);
+    vec3 s = normalize(TangentSpotlightPos - position);
 
-    float cosAngle = dot(-s, normalize(TangentSpotlightsDir[lightIndex]));
+    float cosAngle = dot(-s, normalize(TangentSpotlightDir));
     float angle = acos(cosAngle);
 
-    if (angle >= 0.0f && angle < Spotlights[lightIndex].OuterCutoff) // OuterCutoff
+    if (angle >= 0.0f && angle < Spotlight.OuterCutoff) // OuterCutoff
     {
         //float interpolation = (angle - Spotlights[lightIndex].InnerCutoff) / (Spotlights[lightIndex].OuterCutoff - Spotlights[lightIndex].InnerCutoff);
         //float epsilon = cos(Spotlights[lightIndex].OuterCutoff) - cos(Spotlights[lightIndex].InnerCutoff);
         //float intensity = clamp((cosAngle - cos(Spotlights[lightIndex].OuterCutoff)) / epsilon, 0.0, 1.0);
-        lightIntensity = Spotlights[lightIndex].L; //* intensity;
+        lightIntensity = Spotlight.L; //* intensity;
 
-        l = TangentSpotlightsPos[lightIndex] - position;
+        l = TangentSpotlightPos - position;
         float dist = length(l);
         l = normalize(l);
         lightIntensity /= (dist * dist); // attenuation
@@ -122,24 +122,11 @@ vec4 pass1()
     // Calculate normal direction from normal map texture. Already in tangent space, so no conversion
     vec3 norm = texture(NormalTexture, TexCoord).xyz;
     norm.xy = 2.0f * norm.xy - 1.0f;
+    norm = (gl_FrontFacing) ? normalize(norm) : normalize(-norm);
 
     vec3 Colour = vec3(0.0f, 0.0f, 0.0f);
 
-    // Loop through all lights for PBR
-    if (gl_FrontFacing)
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            Colour += microfacetModel(i, TangentFragPos, normalize(norm));
-        }
-    }
-    else
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            Colour += microfacetModel(i, TangentFragPos, normalize(-norm));
-        }
-    }
+    Colour += microfacetModel(TangentFragPos, norm);
 
     vec3 ambient = vec3(0.03) * texture(AlbedoTexture, TexCoord).rgb * texture(AOTexture, TexCoord).rgb;
     Colour += ambient;

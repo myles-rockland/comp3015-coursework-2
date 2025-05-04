@@ -1,7 +1,6 @@
 #version 460
 
 in vec2 TexCoord;
-in vec3 Position;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -58,7 +57,7 @@ vec4 pass3()
 {
     float dy = 1.0 / (textureSize(BlurTex1, 0)).y;
     vec4 sum = texture(BlurTex1, TexCoord) * Weight[0];
-    for(int i = 0; i < 10; i++)
+    for(int i = 1; i < 10; i++)
     {
         sum += texture(BlurTex1, TexCoord + vec2(0.0, PixOffset[i]) * dy) * Weight[i];
         sum += texture(BlurTex1, TexCoord - vec2(0.0, PixOffset[i]) * dy) * Weight[i];
@@ -71,7 +70,7 @@ vec4 pass4()
 {
     float dx = 1.0 / (textureSize(BlurTex2, 0)).x;
     vec4 sum = texture(BlurTex2, TexCoord) * Weight[0];
-    for(int i = 0; i < 10; i++)
+    for(int i = 1; i < 10; i++)
     {
         sum += texture(BlurTex2, TexCoord + vec2(PixOffset[i], 0.0) * dx) * Weight[i];
         sum += texture(BlurTex2, TexCoord - vec2(PixOffset[i], 0.0) * dx) * Weight[i];

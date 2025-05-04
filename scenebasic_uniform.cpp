@@ -20,24 +20,17 @@ using namespace glm;
 
 SceneBasic_Uniform::SceneBasic_Uniform() :
     plane(100.0f, 100.0f, 1, 1),
-    tPrev(0),
-    angle(0.0f),
-    rotSpeed(pi<float>() / 8.0f),
-    whiteLightsEnabled(true),
-    bloomEnabled(true),
-    cameraPosition(0.0f, 0.0f, 10.0f),
-    cameraForward(0.0f, 0.0f, 1.0f),
-    cameraUp(0.0f, 1.0f, 0.0f),
-    cameraYaw(-90.0f),
-    cameraPitch(0.0f),
-    cameraSpeed(5.0f),
-    cameraSensitivity(0.025f),
-    mouseFirstEntry(true),
-    lastXPos(width / 2.0f),
-    lastYPos(height / 2.0f)
+    tPrev(0), angle(0.0f), rotSpeed(pi<float>() / 8.0f),
+    whiteLightsEnabled(true), bloomEnabled(true),
+    cameraPosition(0.0f, 0.0f, 10.0f), cameraForward(0.0f, 0.0f, 1.0f), cameraUp(0.0f, 1.0f, 0.0f),
+    cameraYaw(-90.0f), cameraPitch(0.0f),
+    cameraSpeed(5.0f), cameraSensitivity(0.025f), 
+    mouseFirstEntry(true), lastXPos(width / 2.0f), lastYPos(height / 2.0f),
+    spotlight(vec4(cameraPosition, 1.0), cameraForward, vec3(2500.0f), 10.0f, 15.0f)
 {
     //gun = ObjMesh::load("media/38-special-revolver/source/rev_anim.obj.obj", false, true);
     gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
+
 }
 
 void SceneBasic_Uniform::initScene()
@@ -56,15 +49,15 @@ void SceneBasic_Uniform::initScene()
     projection = mat4(1.0f);
 
     // Set spotlights radiance/intensity uniforms
-    setSpotlightsIntensity(2500.0f);
+    setSpotlightIntensity(5.0f); // 2500.0f
 
     // Set spotlights cutoff uniforms
-    setSpotlightsInnerCutoff(10.0f);
-    setSpotlightsOuterCutoff(15.0f);
+    setSpotlightInnerCutoff(10.0f);
+    setSpotlightOuterCutoff(15.0f);
 
     // Set misc uniforms
     hdrBloomProg.use();
-    hdrBloomProg.setUniform("LumThresh", 3.0f);
+    hdrBloomProg.setUniform("LumThresh", 5.0f); // 1.2f or 3.0f or 5.0f 
     hdrBloomProg.setUniform("Exposure", 0.35f);
     hdrBloomProg.setUniform("White", 0.982f);
     hdrBloomProg.setUniform("Gamma", 2.2f);
@@ -117,260 +110,35 @@ void SceneBasic_Uniform::compile()
 	}
 }
 
-void SceneBasic_Uniform::update( float t )
+void SceneBasic_Uniform::setSpotlightIntensity(float intensity)
 {
-    float deltaT = t - tPrev;
-    if (tPrev == 0.0f)
-    {
-        deltaT = 0.0f;
-    }
-    tPrev = t;
-    
-    // Increase angle for rotation
-    angle += rotSpeed * deltaT;
-    if (angle >= two_pi<float>())
-    {
-        angle -= two_pi<float>();
-    }
-
-    // Get current window context
-    GLFWwindow* windowContext = glfwGetCurrentContext();
-
-    // Handle keyboard input
-    handleKeyboardInput(windowContext, deltaT);
-
-    // Handle mouse input
-    handleMouseMovement(windowContext, deltaT);
-    handleMouseClicks(windowContext);
-
-}
-
-void SceneBasic_Uniform::render()
-{
-    pass1();
-    computeLogAveLuminance();
-    pass2();
-    pass3();
-    pass4();
-    pass5();
-}
-
-void SceneBasic_Uniform::pass1() // Draw the scene normally
-{
-    hdrBloomProg.use();
-    hdrBloomProg.setUniform("Pass", 1);
-    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-    glViewport(0, 0, width, height);
-    glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
-    view = lookAt(cameraPosition, cameraPosition + cameraForward, cameraUp);
-    projection = glm::perspective(glm::radians(70.0f), (float)width / height, 0.3f, 100.0f);
-
-    drawScene();
-}
-
-void SceneBasic_Uniform::pass2() // Draw the blur
-{
-    hdrBloomProg.use();
-    hdrBloomProg.setUniform("Pass", 2);
-    glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
-    glViewport(0, 0, bloomBufWidth, bloomBufHeight);
-    glDisable(GL_DEPTH_TEST);
-
-    glClearColor(0, 0, 0, 0);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    model = mat4(1.0f);
-    view = mat4(1.0f);
-    projection = mat4(1.0f);
-
-    setMatrices(hdrBloomProg);
-
-    glBindVertexArray(fsQuad);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    //glBindVertexArray(0);
-}
-
-void SceneBasic_Uniform::pass3()
-{
-    hdrBloomProg.use();
-    hdrBloomProg.setUniform("Pass", 3);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex2, 0);
-
-    glBindVertexArray(fsQuad);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-void SceneBasic_Uniform::pass4()
-{
-    hdrBloomProg.use();
-    hdrBloomProg.setUniform("Pass", 4);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
-
-    glBindVertexArray(fsQuad);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-void SceneBasic_Uniform::pass5()
-{
-    hdrBloomProg.use();
-    hdrBloomProg.setUniform("Pass", 5);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-    glViewport(0, 0, width, height);
-
-    glBindSampler(1, linearSampler);
-    glBindVertexArray(fsQuad);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    //glBindVertexArray(0);
-    glBindSampler(1, nearestSampler);
-}
-
-void SceneBasic_Uniform::drawScene()
-{
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Set normal matrix using view
-    model = mat4(1.0f);
-    mat4 mv = view * model;
-    mat3 normalMatrix = mat3(transpose(inverse(mv))); //mat3 normalMatrix = mat3(vec3(view[0]), vec3(view[1]), vec3(view[2]));
-
-    // Set spotlight uniforms
-    for (int i = 0; i < 3; i++)
-    {
-        // Position
-        std::stringstream positionName;
-        positionName << "Spotlights[" << i << "].Position";
-        float x = 50.0f * sin(angle + (two_pi<float>() / 3) * i);
-        float z = 50.0f * cos(angle + (two_pi<float>() / 3) * i);
-        vec4 lightPos = vec4(x, 15.0f, z, 1.0f);
-        pbrProg.use();
-        pbrProg.setUniform(positionName.str().c_str(), view * lightPos);
-
-        // Direction
-        std::stringstream directionName;
-        directionName << "Spotlights[" << i << "].Direction";
-        pbrProg.use();
-        //pbrProg.setUniform(directionName.str().c_str(), normalMatrix * vec3(-lightPos.x, -lightPos.y, -lightPos.z)); // -lightPos.x, y and z
-        pbrProg.setUniform(directionName.str().c_str(), vec3(view * vec4(-lightPos.x, -lightPos.y, -lightPos.z, 0.0f))); // I think this should be in view space...
-    }
-
-    // Skybox rendering
-    skyboxProg.use();
-
-    model = mat4(1.0f);
-    view = lookAt(vec3(0.0f), cameraForward, cameraUp); // For infinite skybox
-
-    setMatrices(skyboxProg);
-    skybox.render();
-
-    view = lookAt(cameraPosition, cameraPosition + cameraForward, cameraUp); // Back to normal
-
-    // Plane rendering
-    pbrProg.use();
-
-    // Set camera position
-    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
-
-    // Set plane model matrix
-    model = mat4(1.0f);
-    model = translate(model, vec3(0.0f, -10.0f, 0.0f));
-
-    // Bind default, set MVP matrix uniforms and render plane
-    bindPbrTextures(defaultAlbedoTexture, defaultNormalTexture, defaultMetallicTexture, defaultRoughnessTexture, defaultAOTexture);
-    setMatrices(pbrProg);
-    plane.render();
-
-    // Gun rendering
-    pbrProg.use();
-
-    // Set camera position
-    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
-
-    // Set gun model matrix
-    model = mat4(1.0f);
-
-    /*model = scale(model, vec3(3.0f)); // Don't need this yet - wait for gamification
-    model = translate(model, cameraPosition);
-    model = translate(model, -1.0f * cameraUp);
-    model = translate(model, 1.0f * normalize(cross(cameraForward, cameraUp)));*/
-
-    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f)); // Really old stuff from CW1
-    //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
-    //model = scale(model, vec3(0.05f));
-
-    // Bind gun textures, set MVP matrix uniforms and render gun
-    bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
-    setMatrices(pbrProg);
-    gun->render();
-}
-
-void SceneBasic_Uniform::resize(int w, int h)
-{
-    glViewport(0, 0, w, h);
-    width = w;
-    height = h;
-    projection = glm::perspective(glm::radians(70.0f), (float)w / h, 0.3f, 100.0f);
-}
-
-void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
-{
-    glm::mat4 mv = view * model;
-    p.setUniform("ModelMatrix", model);
-    p.setUniform("ModelViewMatrix", mv);
-    p.setUniform("MVP", projection * mv);
-    p.setUniform("NormalMatrix", transpose(inverse(mat3(vec3(mv[0]), vec3(mv[1]), vec3(mv[2])))));
-}
-
-void SceneBasic_Uniform::setSpotlightsIntensity(float intensity)
-{
+    // Set spotlight objects
     if (whiteLightsEnabled)
     {
-        // Gun program
-        pbrProg.use();
-        pbrProg.setUniform("Spotlights[0].L", vec3(intensity));
-        pbrProg.setUniform("Spotlights[1].L", vec3(intensity));
-        pbrProg.setUniform("Spotlights[2].L", vec3(intensity));
+        spotlight.setIntensity(vec3(intensity));
     }
     else
     {
-        // Gun program
-        pbrProg.use();
-        pbrProg.setUniform("Spotlights[0].L", vec3(intensity, 0.0f, 0.0f));
-        pbrProg.setUniform("Spotlights[1].L", vec3(0.0f, intensity, 0.0f));
-        pbrProg.setUniform("Spotlights[2].L", vec3(0.0f, 0.0f, intensity));
+        spotlight.setIntensity(vec3(intensity, 0.0f, intensity));
     }
+
+    // Set uniforms
+    pbrProg.use();
+    pbrProg.setUniform("Spotlight.L", spotlight.getIntensity());
 }
 
-void SceneBasic_Uniform::setSpotlightsInnerCutoff(float degrees)
+void SceneBasic_Uniform::setSpotlightInnerCutoff(float degrees)
 {
-    for (int i = 0; i < 3; i++)
-    {
-        std::stringstream cutoffName;
-        cutoffName << "Spotlights[" << i << "].InnerCutoff";
-        pbrProg.use();
-        pbrProg.setUniform(cutoffName.str().c_str(), radians(degrees));
-    }
+    spotlight.setInnerCutoff(degrees);
+    pbrProg.use();
+    pbrProg.setUniform("Spotlight.InnerCutoff", spotlight.getInnerCutoff());
 }
 
-void SceneBasic_Uniform::setSpotlightsOuterCutoff(float degrees)
+void SceneBasic_Uniform::setSpotlightOuterCutoff(float degrees)
 {
-    for (int i = 0; i < 3; i++)
-    {
-        std::stringstream cutoffName;
-        cutoffName << "Spotlights[" << i << "].OuterCutoff";
-        pbrProg.use();
-        pbrProg.setUniform(cutoffName.str().c_str(), radians(degrees));
-    }
+    spotlight.setOuterCutoff(degrees);
+    pbrProg.use();
+    pbrProg.setUniform("Spotlight.OuterCutoff", spotlight.getOuterCutoff());
 }
 
 void SceneBasic_Uniform::setupTextures()
@@ -414,13 +182,22 @@ void SceneBasic_Uniform::bindPbrTextures(GLuint albedo, GLuint normal, GLuint me
     glBindTexture(GL_TEXTURE_2D, ao);
 }
 
-void SceneBasic_Uniform::setupFBO() {
+void SceneBasic_Uniform::setupFBO() 
+{
+    setupHdrFBO();
+    
+    setupBlurFBO();
+}
+
+void SceneBasic_Uniform::setupHdrFBO()
+{
     // Generate and bind the framebuffer
     glGenFramebuffers(1, &hdrFbo);
     glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
 
     // Create the texture object
     glGenTextures(1, &hdrTex);
+    std::cout << "hdrTex has ID: " << hdrTex << std::endl;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTex);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, width, height);
@@ -428,7 +205,7 @@ void SceneBasic_Uniform::setupFBO() {
     // Bind the texture to the FBO
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, hdrTex, 0);
 
-    // Create the depth buffer
+    // Create the depth buffer. Not sure if we actually need this...
     GLuint depthBuf;
     glGenRenderbuffers(1, &depthBuf);
     glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
@@ -441,6 +218,12 @@ void SceneBasic_Uniform::setupFBO() {
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
     glDrawBuffers(1, drawBuffers);
 
+    // Unbind the framebuffer, and revert to default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void SceneBasic_Uniform::setupBlurFBO()
+{
     // Create an FBO for the bright-pass filter and blur
     glGenFramebuffers(1, &blurFbo);
     glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
@@ -462,6 +245,7 @@ void SceneBasic_Uniform::setupFBO() {
 
     // Bind tex1 to the FBO
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
     glDrawBuffers(1, drawBuffers);
 
     // Unbind the framebuffer, and revert to default framebuffer
@@ -522,6 +306,13 @@ void SceneBasic_Uniform::computeWeights()
     }
 }
 
+float SceneBasic_Uniform::gauss(float x, float sigma2)
+{
+    double coeff = 1.0 / (two_pi<float>() * sigma2);
+    double exponent = -(x * x) / (2.0 * sigma2);
+    return (float)(coeff * exp(exponent));
+}
+
 void SceneBasic_Uniform::setupSamplers()
 {
     // Set up two sampler objects for linear and nearest filtering
@@ -548,7 +339,36 @@ void SceneBasic_Uniform::setupSamplers()
     // We want nearest sampling except for the last pass.
     glBindSampler(0, nearestSampler);
     glBindSampler(1, nearestSampler);
-    glBindSampler(2, nearestSampler);
+    glBindSampler(2, nearestSampler); // Seemingly an issue with sampler 2... maybe I should output it?
+    std::cout << "This nearestSampler has ID: " << nearestSampler << std::endl;
+}
+
+void SceneBasic_Uniform::update( float t )
+{
+    float deltaT = t - tPrev;
+    if (tPrev == 0.0f)
+    {
+        deltaT = 0.0f;
+    }
+    tPrev = t;
+    
+    // Increase angle for rotation
+    angle += rotSpeed * deltaT;
+    if (angle >= two_pi<float>())
+    {
+        angle -= two_pi<float>();
+    }
+
+    // Get current window context
+    GLFWwindow* windowContext = glfwGetCurrentContext();
+
+    // Handle keyboard input
+    handleKeyboardInput(windowContext, deltaT);
+
+    // Handle mouse input
+    handleMouseMovement(windowContext, deltaT);
+    handleMouseClicks(windowContext);
+
 }
 
 void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float deltaTime)
@@ -580,7 +400,7 @@ void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float de
     if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
     {
         whiteLightsEnabled = !whiteLightsEnabled;
-        setSpotlightsIntensity(2500.0f);
+        setSpotlightIntensity(5.0f);
     }
     if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
     {
@@ -649,6 +469,102 @@ void SceneBasic_Uniform::handleMouseClicks(GLFWwindow* windowContext)
     }
 }
 
+void SceneBasic_Uniform::render()
+{
+    pass1();
+    computeLogAveLuminance();
+    pass2();
+    pass3();
+    pass4();
+    pass5();
+}
+
+void SceneBasic_Uniform::drawScene()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Set normal matrix using model-view. Working in view/eye/camera space
+    model = mat4(1.0f);
+    mat4 mv = view * model;
+    mat3 normalMatrix = mat3(transpose(inverse(mv)));
+
+    // Set spotlight uniforms
+    // Position
+    spotlight.setPosition(vec4(cameraPosition, 1.0f));
+    pbrProg.use();
+    pbrProg.setUniform("Spotlight.Position", view * spotlight.getPosition());
+
+    // Direction
+    spotlight.setDirection(cameraForward);
+    pbrProg.use();
+    pbrProg.setUniform("Spotlight.Direction", vec3(view * vec4(spotlight.getDirection(), 0.0f)));
+
+    // Skybox rendering
+    skyboxProg.use();
+
+    model = mat4(1.0f);
+    mat4 prevView = view;
+    view = lookAt(vec3(0.0f), cameraForward, cameraUp); // For infinite skybox
+
+    setMatrices(skyboxProg);
+    skybox.render();
+
+    view = prevView; // Back to normal
+
+    // Plane rendering
+    pbrProg.use();
+
+    // Set camera position
+    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
+
+    // Set plane model matrix
+    model = mat4(1.0f);
+    model = translate(model, vec3(0.0f, -10.0f, 0.0f));
+
+    // Bind default, set MVP matrix uniforms and render plane
+    bindPbrTextures(defaultAlbedoTexture, defaultNormalTexture, defaultMetallicTexture, defaultRoughnessTexture, defaultAOTexture);
+    setMatrices(pbrProg);
+    plane.render();
+
+    // Gun rendering
+    pbrProg.use();
+
+    // Set camera position
+    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
+
+    // Set gun model matrix
+    model = mat4(1.0f);
+
+    /*model = scale(model, vec3(3.0f)); // Don't need this yet - wait for gamification
+    model = translate(model, cameraPosition);
+    model = translate(model, -1.0f * cameraUp);
+    model = translate(model, 1.0f * normalize(cross(cameraForward, cameraUp)));*/
+
+    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f)); // Really old stuff from CW1
+    //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
+    //model = scale(model, vec3(0.05f));
+
+    // Bind gun textures, set MVP matrix uniforms and render gun
+    bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
+    setMatrices(pbrProg);
+    gun->render();
+}
+
+void SceneBasic_Uniform::pass1() // Draw the scene normally
+{
+    pbrProg.use();
+    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+    glViewport(0, 0, width, height);
+    glBindFramebuffer(GL_FRAMEBUFFER, hdrFbo);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+    view = lookAt(cameraPosition, cameraPosition + cameraForward, cameraUp);
+    projection = glm::perspective(glm::radians(70.0f), (float)width / height, 0.3f, 100.0f);
+
+    drawScene();
+}
+
 void SceneBasic_Uniform::computeLogAveLuminance()
 {
     int size = width * height;
@@ -667,9 +583,83 @@ void SceneBasic_Uniform::computeLogAveLuminance()
     hdrBloomProg.setUniform("AveLum", expf(sum / size));
 }
 
-float SceneBasic_Uniform::gauss(float x, float sigma2)
+void SceneBasic_Uniform::pass2() // Draw the blur
 {
-    double coeff = 1.0 / (two_pi<float>() * sigma2);
-    double exponent = -(x * x) / (2.0 * sigma2);
-    return (float)(coeff * exp(exponent));
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 2);
+    glBindFramebuffer(GL_FRAMEBUFFER, blurFbo);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
+    glViewport(0, 0, bloomBufWidth, bloomBufHeight);
+    glDisable(GL_DEPTH_TEST);
+
+    glClearColor(0, 0, 0, 0);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    model = mat4(1.0f);
+    view = mat4(1.0f);
+    projection = mat4(1.0f);
+
+    setMatrices(hdrBloomProg);
+
+    glBindVertexArray(fsQuad);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    //glBindVertexArray(0);
+}
+
+void SceneBasic_Uniform::pass3()
+{
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 3);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex2, 0);
+
+    glBindVertexArray(fsQuad);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void SceneBasic_Uniform::pass4()
+{
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 4);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
+
+    glBindVertexArray(fsQuad);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void SceneBasic_Uniform::pass5()
+{
+    hdrBloomProg.use();
+    hdrBloomProg.setUniform("Pass", 5);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(0, 0, width, height);
+
+    glBindSampler(1, linearSampler);
+    glBindVertexArray(fsQuad);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    //glBindVertexArray(0);
+    glBindSampler(1, nearestSampler);
+}
+
+void SceneBasic_Uniform::resize(int w, int h)
+{
+    glViewport(0, 0, w, h);
+    width = w;
+    height = h;
+    projection = glm::perspective(glm::radians(70.0f), (float)w / h, 0.3f, 100.0f);
+}
+
+void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
+{
+    glm::mat4 mv = view * model;
+    p.setUniform("ModelMatrix", model);
+    p.setUniform("ModelViewMatrix", mv);
+    p.setUniform("MVP", projection * mv);
+    p.setUniform("NormalMatrix", mat3(transpose(inverse(mv))));
 }
