@@ -31,4 +31,6 @@ float Spotlight::getOuterCutoff() { return outerCutoff; }
 
 mat4 Spotlight::getViewMatrix() { return lookAt(vec3(position), vec3(position) + direction, vec3(0.0f, 1.0f, 0.0f)); }
 
-mat4 Spotlight::getProjectionMatrix() { return ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 25.0f); } // Maybe this could/should be perspective instead of orthographic
+//mat4 Spotlight::getProjectionMatrix() { return ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 25.0f); } // Maybe this could/should be perspective instead of orthographic
+
+mat4 Spotlight::getProjectionMatrix() { return perspective(50.0f, 1.0f, 1.0f, 25.0f); } // Maybe this could/should be perspective instead of orthographic

@@ -14,18 +14,26 @@
 #include "helper/plane.h"
 #include "helper/objmesh.h"
 #include "helper/skybox.h"
+#include "helper/random.h"
+#include "helper/particleutils.h"
 #include "Spotlight.h"
 
 class SceneBasic_Uniform : public Scene
 {
 private:
-    GLSLProgram hdrBloomProg, pbrProg, skyboxProg;
+    GLSLProgram hdrBloomProg, pbrProg, skyboxProg, particlesProg;
+
+    Random rand;
+    GLuint initVel, startTime, particles, nParticles;
+    vec3 emitterPos, emitterDir;
+    float time, particleLifetime;
 
     std::unique_ptr<ObjMesh> gun;
     Plane plane;
     SkyBox skybox;
     Spotlight spotlight;
 
+    // FBOs, textures and samplers
     GLuint fsQuad, hdrFbo, blurFbo, hdrTex, tex1, tex2;
     GLuint linearSampler, nearestSampler;
     int bloomBufWidth, bloomBufHeight;
@@ -62,6 +70,9 @@ private:
     GLuint defaultRoughnessTexture;
     GLuint defaultAOTexture;
 
+    // Particles texture
+    GLuint particlesTexture;
+
     void compile();
     void setupFBO();
     void setupHdrFBO();
@@ -88,6 +99,10 @@ private:
     void handleKeyboardInput(GLFWwindow* windowContext, float deltaTime);
     void handleMouseMovement(GLFWwindow* windowContext, float deltaTime);
     void handleMouseClicks(GLFWwindow* windowContext);
+
+    void initBuffers();
+    float randFloat();
+    void setupParticles();
 
 public:
     SceneBasic_Uniform();

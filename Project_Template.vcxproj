@@ -155,7 +155,6 @@ xcopy /y /i /e "$(ProjectDir)shader" "$(OutDir)shader\"</Command>
   <ItemGroup>
     <ClCompile Include="glad.c" />
     <ClCompile Include="helper\cube.cpp" />
-    <ClCompile Include="helper\frustum.cpp" />
     <ClCompile Include="helper\glslprogram.cpp" />
     <ClCompile Include="helper\glutils.cpp" />
     <ClCompile Include="helper\objmesh.cpp" />
@@ -177,8 +176,8 @@ xcopy /y /i /e "$(ProjectDir)shader" "$(OutDir)shader\"</Command>
     <None Include="shader\hdrBloom.vert" />
     <None Include="shader\pbr.frag" />
     <None Include="shader\pbr.vert" />
-    <None Include="shader\plane.frag" />
-    <None Include="shader\plane.vert" />
+    <None Include="shader\particles.frag" />
+    <None Include="shader\particles.vert" />
     <None Include="shader\skybox.frag" />
     <None Include="shader\skybox.vert" />
   </ItemGroup>
@@ -186,11 +185,12 @@ xcopy /y /i /e "$(ProjectDir)shader" "$(OutDir)shader\"</Command>
     <ClInclude Include="helper\aabb.h" />
     <ClInclude Include="helper\cube.h" />
     <ClInclude Include="helper\drawable.h" />
-    <ClInclude Include="helper\frustum.h" />
     <ClInclude Include="helper\glslprogram.h" />
     <ClInclude Include="helper\glutils.h" />
     <ClInclude Include="helper\objmesh.h" />
+    <ClInclude Include="helper\particleutils.h" />
     <ClInclude Include="helper\plane.h" />
+    <ClInclude Include="helper\random.h" />
     <ClInclude Include="helper\scene.h" />
     <ClInclude Include="helper\scenerunner.h" />
     <ClInclude Include="helper\skybox.h" />

@@ -24,13 +24,12 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     whiteLightsEnabled(true), bloomEnabled(true),
     cameraPosition(0.0f, 0.0f, 10.0f), cameraForward(0.0f, 0.0f, 1.0f), cameraUp(0.0f, 1.0f, 0.0f),
     cameraYaw(-90.0f), cameraPitch(0.0f),
-    cameraSpeed(5.0f), cameraSensitivity(0.025f), 
+    cameraSpeed(5.0f), cameraSensitivity(0.025f),
     mouseFirstEntry(true), lastXPos(width / 2.0f), lastYPos(height / 2.0f),
-    spotlight(vec4(cameraPosition, 1.0), cameraForward, vec3(2500.0f), 10.0f, 15.0f)
+    spotlight(vec4(cameraPosition, 1.0), cameraForward, vec3(2500.0f), 10.0f, 15.0f),
+    time(0), particleLifetime(30.0f), nParticles(8000), emitterPos(1, 0, 0), emitterDir(-1, 2, 0)
 {
-    //gun = ObjMesh::load("media/38-special-revolver/source/rev_anim.obj.obj", false, true);
     gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
-
 }
 
 void SceneBasic_Uniform::initScene()
@@ -49,7 +48,7 @@ void SceneBasic_Uniform::initScene()
     projection = mat4(1.0f);
 
     // Set spotlights radiance/intensity uniforms
-    setSpotlightIntensity(5.0f); // 2500.0f
+    setSpotlightIntensity(10.0f); // 2500.0f
 
     // Set spotlights cutoff uniforms
     setSpotlightInnerCutoff(10.0f);
@@ -80,6 +79,9 @@ void SceneBasic_Uniform::initScene()
 
     // Set up two sampler objects for linear and nearest filtering
     setupSamplers();
+
+    // Set up everything to do with particles
+    setupParticles();
 }
 
 void SceneBasic_Uniform::compile()
@@ -95,12 +97,15 @@ void SceneBasic_Uniform::compile()
         // HDR + Bloom shader
         hdrBloomProg.compileShader("shader/hdrBloom.vert");
         hdrBloomProg.compileShader("shader/hdrBloom.frag");
-        
+        // Particles shader
+        particlesProg.compileShader("shader/particles.vert");
+        particlesProg.compileShader("shader/particles.frag");
 
         // Link Shaders
         skyboxProg.link();
         pbrProg.link();
         hdrBloomProg.link();
+        particlesProg.link();
 
         // Use pbr shader to begin
         pbrProg.use();
@@ -139,6 +144,26 @@ void SceneBasic_Uniform::setSpotlightOuterCutoff(float degrees)
     spotlight.setOuterCutoff(degrees);
     pbrProg.use();
     pbrProg.setUniform("Spotlight.OuterCutoff", spotlight.getOuterCutoff());
+}
+
+void SceneBasic_Uniform::setupParticles()
+{
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    initBuffers();
+
+    // The particle texture
+    glActiveTexture(GL_TEXTURE8);
+    particlesTexture = Texture::loadTexture("media/textures/fire_particles.png");
+    glBindTexture(GL_TEXTURE_2D, particlesTexture);
+
+    particlesProg.use();
+    particlesProg.setUniform("ParticleTex", 8);
+    particlesProg.setUniform("ParticleLifetime", particleLifetime);
+    particlesProg.setUniform("ParticleSize", 0.05f);
+    particlesProg.setUniform("Gravity", vec3(0.0f, -0.2f, 0.0f));
+    particlesProg.setUniform("EmitterPos", emitterPos);
 }
 
 void SceneBasic_Uniform::setupTextures()
@@ -180,6 +205,78 @@ void SceneBasic_Uniform::bindPbrTextures(GLuint albedo, GLuint normal, GLuint me
     glBindTexture(GL_TEXTURE_2D, roughness);
     glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, ao);
+}
+
+void SceneBasic_Uniform::initBuffers()
+{
+    // Generate the buffers for initial velocity and start (birth) time
+    glGenBuffers(1, &initVel); // Initial velocity buffer
+    glGenBuffers(1, &startTime); // Start time buffer
+
+    // Allocate space for all buffers
+    int size = nParticles * sizeof(float);
+    glBindBuffer(GL_ARRAY_BUFFER, initVel);
+    glBufferData(GL_ARRAY_BUFFER, size * 3, 0, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, startTime);
+    glBufferData(GL_ARRAY_BUFFER, size, 0, GL_STATIC_DRAW);
+
+    // Fill the first velocity buffer with random velocities
+    glm::mat3 emitterBasis = ParticleUtils::makeArbitraryBasis(emitterDir);
+    vec3 v(0.0f);
+    float velocity, theta, phi;
+    std::vector<GLfloat> data(nParticles * 3);
+    for (uint32_t i = 0; i < nParticles; i++) 
+    {
+        //pick the direction of the velocity
+        theta = glm::mix(0.0f, glm::pi<float>() / 20.0f, randFloat());
+        phi = glm::mix(0.0f, glm::two_pi<float>(), randFloat());
+
+        v.x = sinf(theta) * cosf(phi);
+        v.y = cosf(theta);
+        v.z = sinf(theta) * sinf(phi);
+
+        //scale to set the magnitude of the velocity
+        velocity = glm::mix(1.25f, 1.5f, randFloat());
+        v = glm::normalize(emitterBasis * v) * velocity;
+
+        data[3 * i] = v.x;
+        data[3 * i + 1] = v.y;
+        data[3 * i + 2] = v.z;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, initVel);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, size * 3, data.data());
+
+    // Fill the start time buffer
+    float rate = particleLifetime / nParticles;
+    for (int i = 0; i < nParticles; i++)
+    {
+        data[i] = rate * i;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, startTime);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, nParticles * sizeof(float), data.data());
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glGenVertexArrays(1, &particles);
+    glBindVertexArray(particles);
+    glBindBuffer(GL_ARRAY_BUFFER, initVel);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, startTime);
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribDivisor(0, 1);
+    glVertexAttribDivisor(1, 1);
+
+    glBindVertexArray(0);
+}
+
+float SceneBasic_Uniform::randFloat() 
+{
+    return rand.nextFloat();
 }
 
 void SceneBasic_Uniform::setupFBO() 
@@ -345,6 +442,8 @@ void SceneBasic_Uniform::setupSamplers()
 
 void SceneBasic_Uniform::update( float t )
 {
+    time = t;
+
     float deltaT = t - tPrev;
     if (tPrev == 0.0f)
     {
@@ -400,7 +499,7 @@ void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float de
     if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
     {
         whiteLightsEnabled = !whiteLightsEnabled;
-        setSpotlightIntensity(5.0f);
+        setSpotlightIntensity(10.0f);
     }
     if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
     {
@@ -526,6 +625,17 @@ void SceneBasic_Uniform::drawScene()
     setMatrices(pbrProg);
     plane.render();
 
+    // Particles rendering
+    model = mat4(1.0f);
+    glDepthMask(GL_FALSE);
+    particlesProg.use();
+    setMatrices(particlesProg);
+    particlesProg.setUniform("Time", time);
+    glBindVertexArray(particles);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, nParticles);
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+
     // Gun rendering
     pbrProg.use();
 
@@ -560,7 +670,7 @@ void SceneBasic_Uniform::pass1() // Draw the scene normally
     glEnable(GL_DEPTH_TEST);
 
     view = lookAt(cameraPosition, cameraPosition + cameraForward, cameraUp);
-    projection = glm::perspective(glm::radians(70.0f), (float)width / height, 0.3f, 100.0f);
+    projection = glm::perspective(glm::radians(70.0f), (float)width / height, 0.3f, 1000.0f);
 
     drawScene();
 }
@@ -605,7 +715,7 @@ void SceneBasic_Uniform::pass2() // Draw the blur
 
     glBindVertexArray(fsQuad);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    //glBindVertexArray(0);
+    glBindVertexArray(0);
 }
 
 void SceneBasic_Uniform::pass3()
@@ -617,6 +727,7 @@ void SceneBasic_Uniform::pass3()
 
     glBindVertexArray(fsQuad);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
 }
 
 void SceneBasic_Uniform::pass4()
@@ -643,7 +754,7 @@ void SceneBasic_Uniform::pass5()
     glBindSampler(1, linearSampler);
     glBindVertexArray(fsQuad);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    //glBindVertexArray(0);
+    glBindVertexArray(0);
     glBindSampler(1, nearestSampler);
 }
 
@@ -652,7 +763,7 @@ void SceneBasic_Uniform::resize(int w, int h)
     glViewport(0, 0, w, h);
     width = w;
     height = h;
-    projection = glm::perspective(glm::radians(70.0f), (float)w / h, 0.3f, 100.0f);
+    projection = glm::perspective(glm::radians(70.0f), (float)w / h, 0.3f, 1000.0f);
 }
 
 void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
@@ -660,6 +771,7 @@ void SceneBasic_Uniform::setMatrices(GLSLProgram& p)
     glm::mat4 mv = view * model;
     p.setUniform("ModelMatrix", model);
     p.setUniform("ModelViewMatrix", mv);
+    p.setUniform("ProjectionMatrix", projection);
     p.setUniform("MVP", projection * mv);
     p.setUniform("NormalMatrix", mat3(transpose(inverse(mv))));
 }

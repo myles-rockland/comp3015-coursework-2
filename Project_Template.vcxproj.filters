@@ -69,9 +69,6 @@
     <ClCompile Include="glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="helper\frustum.cpp">
-      <Filter>helper</Filter>
-    </ClCompile>
     <ClCompile Include="Spotlight.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -83,10 +80,10 @@
     <None Include="shader\basic_uniform.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shader\plane.frag">
+    <None Include="shader\particles.frag">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shader\plane.vert">
+    <None Include="shader\particles.vert">
       <Filter>shaders</Filter>
     </None>
     <None Include="shader\skybox.frag">
@@ -166,11 +163,14 @@
     <ClInclude Include="helper\texture.h">
       <Filter>helper</Filter>
     </ClInclude>
-    <ClInclude Include="helper\frustum.h">
-      <Filter>helper</Filter>
-    </ClInclude>
     <ClInclude Include="Spotlight.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="helper\particleutils.h">
+      <Filter>helper</Filter>
+    </ClInclude>
+    <ClInclude Include="helper\random.h">
+      <Filter>helper</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
