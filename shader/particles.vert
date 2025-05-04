@@ -18,7 +18,7 @@ uniform mat4 ProjectionMatrix;
 
 // Offsets to the position in camera coordinates for each vertex of the particle's quad
 const vec3 offsets[] = vec3[](vec3(-0.5,-0.5,0), vec3(0.5,-0.5,0), vec3(0.5,0.5,0),
-							   vec3(-0.5,-0.5,0), vec3(0.5,0.5,0), vec3(-0.5,0.5,0));
+							  vec3(-0.5,-0.5,0), vec3(0.5,0.5,0), vec3(-0.5,0.5,0));
 // Texture coordinates for each vertex of the particle's quad
 const vec2 texCoords[] = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,0), vec2(1,1), vec2(0,1));
 

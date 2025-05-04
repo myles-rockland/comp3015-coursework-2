@@ -27,7 +27,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     cameraSpeed(5.0f), cameraSensitivity(0.025f),
     mouseFirstEntry(true), lastXPos(width / 2.0f), lastYPos(height / 2.0f),
     spotlight(vec4(cameraPosition, 1.0), cameraForward, vec3(2500.0f), 10.0f, 15.0f),
-    time(0), particleLifetime(30.0f), nParticles(8000), emitterPos(1, 0, 0), emitterDir(-1, 2, 0)
+    time(0), particleLifetime(30.3f), nParticles(1500), emitterPos(1, 0, 0), emitterDir(-1, 2, 0)
 {
     gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
 }
@@ -161,7 +161,7 @@ void SceneBasic_Uniform::setupParticles()
     particlesProg.use();
     particlesProg.setUniform("ParticleTex", 8);
     particlesProg.setUniform("ParticleLifetime", particleLifetime);
-    particlesProg.setUniform("ParticleSize", 0.05f);
+    particlesProg.setUniform("ParticleSize", 0.5f);
     particlesProg.setUniform("Gravity", vec3(0.0f, -0.2f, 0.0f));
     particlesProg.setUniform("EmitterPos", emitterPos);
 }
@@ -631,6 +631,7 @@ void SceneBasic_Uniform::drawScene()
     particlesProg.use();
     setMatrices(particlesProg);
     particlesProg.setUniform("Time", time);
+    particlesProg.setUniform("EmitterPos", emitterPos);
     glBindVertexArray(particles);
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, nParticles);
     glBindVertexArray(0);
@@ -644,15 +645,17 @@ void SceneBasic_Uniform::drawScene()
 
     // Set gun model matrix
     model = mat4(1.0f);
-
-    /*model = scale(model, vec3(3.0f)); // Don't need this yet - wait for gamification
     model = translate(model, cameraPosition);
-    model = translate(model, -1.0f * cameraUp);
-    model = translate(model, 1.0f * normalize(cross(cameraForward, cameraUp)));*/
+    vec3 cameraRight = normalize(cross(cameraForward, cameraUp));
+    model = translate(model, 2.0f * cameraRight);
+    model = translate(model, 3.0f * cameraForward);
 
-    //model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f)); // Really old stuff from CW1
-    //model = rotate(model, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
-    //model = scale(model, vec3(0.05f));
+    model = rotate(model, radians(180.0f), vec3(0.0f, 1.0f, 0.0f));
+    model = rotate(model, -radians(cameraYaw), vec3(0.0f, 1.0f, 0.0f));
+    model = rotate(model, -radians(cameraPitch), vec3(0.0f, 0.0f, 1.0f));
+    
+    model = scale(model, vec3(0.2f));
+    model = translate(model, 5.0f * vec3(0.0f, -1.0f, 0.0f));
 
     // Bind gun textures, set MVP matrix uniforms and render gun
     bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
