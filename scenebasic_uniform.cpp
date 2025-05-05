@@ -177,7 +177,7 @@ void SceneBasic_Uniform::setupTextures()
     defaultAlbedoTexture = Texture::loadTexture("media/textures/grey_1x1.png");
     defaultNormalTexture = Texture::loadTexture("media/textures/normal_up_1x1.png");
     defaultMetallicTexture = Texture::loadTexture("media/textures/black_1x1.png");
-    defaultRoughnessTexture = Texture::loadTexture("media/textures/white_1x1.png");
+    defaultRoughnessTexture = Texture::loadTexture("media/textures/black_1x1.png");
     defaultAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
 
     // Load gun textures

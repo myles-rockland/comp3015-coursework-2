@@ -40,7 +40,7 @@ float luminance(vec3 colour)
 // normal distribution function for approximating ratio of microfacets aligned to h
 float ggxDistribution(float nDotH, float roughness) 
 { 
-    float alpha2 = roughness * roughness * roughness * roughness;
+    float alpha2 = roughness * roughness * roughness * roughness + 0.0001; // To avoid division by 0 in case where roughness = 0 & nDotH = 1
     float d = (nDotH * nDotH) * (alpha2 - 1) + 1;
     return alpha2 / (PI * d * d);
 }
@@ -92,8 +92,8 @@ vec3 microfacetModel(vec3 position, vec3 n) // Reflectance Equation
     float roughness = texture(RoughnessTexture, TexCoord).r; // RGB values are the same as they are greyscale, so only one value needed
     vec3 v = normalize(TangentCameraPos - position);
     vec3 h = normalize(v + l);
-    float nDotH = max(dot(n, h), 0.0); // Ensure non-negative values
-    float vDotH = max(dot(v, h), 0.0);
+    float nDotH = max(dot(n, h), 0.0); // Ensure valid values
+    float vDotH = clamp(dot(v, h), 0.0, 1.0);
     float nDotL = max(dot(n, l), 0.0);
     float nDotV = max(dot(n, v), 0.0);
 
