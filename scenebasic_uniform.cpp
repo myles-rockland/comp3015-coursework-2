@@ -22,6 +22,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     plane(100.0f, 100.0f, 1, 1),
     tPrev(0), angle(0.0f), rotSpeed(pi<float>() / 8.0f),
     whiteLightsEnabled(true), bloomEnabled(true),
+    rightClickedLastFrame(false),
     cameraPosition(0.0f, 0.0f, 10.0f), cameraForward(0.0f, 0.0f, 1.0f), cameraUp(0.0f, 1.0f, 0.0f),
     cameraYaw(-90.0f), cameraPitch(0.0f),
     cameraSpeed(5.0f), cameraSensitivity(0.025f),
@@ -30,6 +31,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     time(0), particleLifetime(30.3f), nParticles(10000), emitterPos(0, 50, 0), emitterDir(0, -1, 0)
 {
     gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
+    target = ObjMesh::load("media/target/target.obj", false, true);
 }
 
 void SceneBasic_Uniform::initScene()
@@ -57,7 +59,7 @@ void SceneBasic_Uniform::initScene()
     // Set misc uniforms
     hdrBloomProg.use();
     hdrBloomProg.setUniform("LumThresh", 5.0f); // 1.2f or 3.0f or 5.0f 
-    hdrBloomProg.setUniform("Exposure", 0.35f);
+    hdrBloomProg.setUniform("Exposure", 0.1f); // 0.35f
     hdrBloomProg.setUniform("White", 0.982f);
     hdrBloomProg.setUniform("Gamma", 2.2f);
     hdrBloomProg.setUniform("BloomEnabled", bloomEnabled);
@@ -124,7 +126,7 @@ void SceneBasic_Uniform::setSpotlightIntensity(float intensity)
     }
     else
     {
-        spotlight.setIntensity(vec3(intensity, 0.0f, intensity));
+        spotlight.setIntensity(vec3(intensity * 0.5f, 0.0f, intensity));
     }
 
     // Set uniforms
@@ -171,6 +173,13 @@ void SceneBasic_Uniform::setupTextures()
     // Load skybox texture
     GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
 
+    // Load default textures
+    defaultAlbedoTexture = Texture::loadTexture("media/textures/grey_1x1.png");
+    defaultNormalTexture = Texture::loadTexture("media/textures/normal_up_1x1.png");
+    defaultMetallicTexture = Texture::loadTexture("media/textures/black_1x1.png");
+    defaultRoughnessTexture = Texture::loadTexture("media/textures/white_1x1.png");
+    defaultAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
+
     // Load gun textures
     gunAlbedoTexture = Texture::loadTexture("media/pistol-with-engravings/textures/BaseColor.png");
     gunNormalTexture = Texture::loadTexture("media/pistol-with-engravings/textures/Normal.png");
@@ -179,11 +188,11 @@ void SceneBasic_Uniform::setupTextures()
     gunAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
 
     // Load default textures
-    defaultAlbedoTexture = Texture::loadTexture("media/textures/grey_1x1.png");
-    defaultNormalTexture = Texture::loadTexture("media/textures/normal_up_1x1.png");
-    defaultMetallicTexture = Texture::loadTexture("media/textures/black_1x1.png");
-    defaultRoughnessTexture = Texture::loadTexture("media/textures/white_1x1.png");
-    defaultAOTexture = Texture::loadTexture("media/textures/white_1x1.png");
+    targetAlbedoTexture = Texture::loadTexture("media/target/textures/target_albedo.png");
+    targetNormalTexture = Texture::loadTexture("media/target/textures/target_normal.png");
+    targetMetallicTexture = defaultMetallicTexture;
+    targetRoughnessTexture = Texture::loadTexture("media/target/textures/target_roughness.png");
+    targetAOTexture = Texture::loadTexture("media/target/textures/target_AO.png");
 
     // Set active texture unit and bind loaded texture ids to 2D texture buffer
     bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
@@ -464,8 +473,10 @@ void SceneBasic_Uniform::setupSamplers()
     // We want nearest sampling except for the last pass.
     glBindSampler(0, nearestSampler);
     glBindSampler(1, nearestSampler);
-    glBindSampler(2, nearestSampler); // Seemingly an issue with sampler 2... maybe I should output it?
-    std::cout << "This nearestSampler has ID: " << nearestSampler << std::endl;
+    glBindSampler(2, nearestSampler);
+    //glBindSampler(0, linearSampler);
+    //glBindSampler(1, linearSampler);
+    //glBindSampler(2, linearSampler);
 }
 
 void SceneBasic_Uniform::update( float t )
@@ -523,11 +534,6 @@ void SceneBasic_Uniform::handleKeyboardInput(GLFWwindow* windowContext, float de
     if (glfwGetKey(windowContext, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) // Move down
     {
         cameraPosition -= cameraUp * cameraSpeed * deltaTime;
-    }
-    if (glfwGetKey(windowContext, GLFW_KEY_2) == GLFW_PRESS) // Toggle rgb/white lights
-    {
-        whiteLightsEnabled = !whiteLightsEnabled;
-        setSpotlightIntensity(10.0f);
     }
     if (glfwGetKey(windowContext, GLFW_KEY_3) == GLFW_PRESS) // Toggle bloom
     {
@@ -590,9 +596,17 @@ void SceneBasic_Uniform::handleMouseClicks(GLFWwindow* windowContext)
     {
         // Shoot bullet
     }
-    if (glfwGetMouseButton(windowContext, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+    if (glfwGetMouseButton(windowContext, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS && !rightClickedLastFrame)
     {
+        rightClickedLastFrame = true;
+
         // Turn on ultraviolet light
+        whiteLightsEnabled = !whiteLightsEnabled;
+        setSpotlightIntensity(10.0f);
+    }
+    else if (glfwGetMouseButton(windowContext, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE)
+    {
+        rightClickedLastFrame = false;
     }
 }
 
@@ -616,14 +630,13 @@ void SceneBasic_Uniform::drawScene()
     mat3 normalMatrix = mat3(transpose(inverse(mv)));
 
     // Set spotlight uniforms
+    pbrProg.use();
     // Position
     spotlight.setPosition(vec4(cameraPosition, 1.0f));
-    pbrProg.use();
     pbrProg.setUniform("Spotlight.Position", view * spotlight.getPosition());
 
     // Direction
     spotlight.setDirection(cameraForward);
-    pbrProg.use();
     pbrProg.setUniform("Spotlight.Direction", vec3(view * vec4(spotlight.getDirection(), 0.0f)));
 
     // Skybox rendering
@@ -646,12 +659,22 @@ void SceneBasic_Uniform::drawScene()
 
     // Set plane model matrix
     model = mat4(1.0f);
-    model = translate(model, vec3(0.0f, -10.0f, 0.0f));
+    model = translate(model, vec3(0.0f, -5.0f, 0.0f));
 
     // Bind default, set MVP matrix uniforms and render plane
     bindPbrTextures(defaultAlbedoTexture, defaultNormalTexture, defaultMetallicTexture, defaultRoughnessTexture, defaultAOTexture);
     setMatrices(pbrProg);
     plane.render();
+
+    // Target rendering
+    // Bind textures, set MVP matrix uniforms and render target
+    model = mat4(1.0f);
+    model = translate(model, vec3(0.0f, -4.0f, 0.0f));
+    model = scale(model, vec3(2.0f));
+
+    bindPbrTextures(targetAlbedoTexture, targetNormalTexture, targetMetallicTexture, targetRoughnessTexture, targetAOTexture);
+    setMatrices(pbrProg);
+    target->render();
 
     // Particles rendering
     model = mat4(1.0f);
@@ -664,7 +687,7 @@ void SceneBasic_Uniform::drawScene()
     glBindVertexArray(0);
     glDepthMask(GL_TRUE);
 
-    // Gun rendering
+    // Player gun rendering
     pbrProg.use();
 
     // Set camera position
@@ -683,6 +706,24 @@ void SceneBasic_Uniform::drawScene()
     
     model = scale(model, vec3(0.2f));
     model = translate(model, 5.0f * vec3(0.0f, -1.0f, 0.0f));
+
+    // Bind gun textures, set MVP matrix uniforms and render gun
+    bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);
+    setMatrices(pbrProg);
+    gun->render();
+
+    // Floor gun rendering
+    pbrProg.use();
+
+    // Set camera position
+    pbrProg.setUniform("CameraPos", view * vec4(cameraPosition, 1.0f));
+
+    // Set gun model matrix
+    model = mat4(1.0f);
+    model = translate(model, 4.5f * vec3(0.0f, -1.0f, 0.0f));
+    model = translate(model, vec3(5.0f, 0.0f, 0.0f));
+    model = rotate(model, radians(90.0f), vec3(1.0f, 0.0f, 0.0f));
+    model = scale(model, vec3(0.2f));
 
     // Bind gun textures, set MVP matrix uniforms and render gun
     bindPbrTextures(gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture);

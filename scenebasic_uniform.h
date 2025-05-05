@@ -28,7 +28,7 @@ private:
     vec3 emitterPos, emitterDir;
     float time, particleLifetime;
 
-    std::unique_ptr<ObjMesh> gun;
+    std::unique_ptr<ObjMesh> gun, target;
     Plane plane;
     SkyBox skybox;
     Spotlight spotlight;
@@ -43,6 +43,7 @@ private:
     float rotSpeed;
 
     bool whiteLightsEnabled, bloomEnabled;
+    bool rightClickedLastFrame;
 
     // Mouse variables
     glm::vec3 cameraPosition, cameraForward, cameraUp; // Relative position within world space
@@ -56,19 +57,14 @@ private:
     float lastXPos;
     float lastYPos;
 
-    // Gun textures
-    GLuint gunAlbedoTexture;
-    GLuint gunNormalTexture;
-    GLuint gunMetallicTexture;
-    GLuint gunRoughnessTexture;
-    GLuint gunAOTexture;
-
     // Default textures
-    GLuint defaultAlbedoTexture;
-    GLuint defaultNormalTexture;
-    GLuint defaultMetallicTexture;
-    GLuint defaultRoughnessTexture;
-    GLuint defaultAOTexture;
+    GLuint defaultAlbedoTexture, defaultNormalTexture, defaultMetallicTexture, defaultRoughnessTexture, defaultAOTexture;
+
+    // Gun textures
+    GLuint gunAlbedoTexture, gunNormalTexture, gunMetallicTexture, gunRoughnessTexture, gunAOTexture;
+
+    // Target textures
+    GLuint targetAlbedoTexture, targetNormalTexture, targetMetallicTexture, targetRoughnessTexture, targetAOTexture;
 
     // Particles texture
     GLuint particlesTexture;
