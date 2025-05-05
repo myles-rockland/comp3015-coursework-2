@@ -2,6 +2,7 @@
 
 layout (location = 0) in vec3 VertexInitVel; // Particle initial velocity
 layout (location = 1) in float VertexBirthTime; // Particle birth time
+layout (location = 2) in vec3 VertexInitPos; // Particle birth time
 
 out float Transp; // Transparency of the particle
 out vec2 TexCoord; // Texture coordinate
@@ -28,7 +29,7 @@ void main()
 
 	float t = Time - VertexBirthTime;
 	if( t >= 0 && t < ParticleLifetime) {
-		vec3 pos = EmitterPos + VertexInitVel * t + Gravity * t * t;
+		vec3 pos = VertexInitPos + VertexInitVel * t + Gravity * t * t;
 		cameraPos = (ModelViewMatrix * vec4(pos,1)).xyz + (offsets[gl_VertexID] * ParticleSize);  //offset the vertex based on the ID
 		Transp = mix (1, 0, t / ParticleLifetime);
 	} else {

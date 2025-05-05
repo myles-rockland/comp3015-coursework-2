@@ -27,7 +27,7 @@ SceneBasic_Uniform::SceneBasic_Uniform() :
     cameraSpeed(5.0f), cameraSensitivity(0.025f),
     mouseFirstEntry(true), lastXPos(width / 2.0f), lastYPos(height / 2.0f),
     spotlight(vec4(cameraPosition, 1.0), cameraForward, vec3(2500.0f), 10.0f, 15.0f),
-    time(0), particleLifetime(30.3f), nParticles(1500), emitterPos(1, 0, 0), emitterDir(-1, 2, 0)
+    time(0), particleLifetime(30.3f), nParticles(10000), emitterPos(0, 50, 0), emitterDir(0, -1, 0)
 {
     gun = ObjMesh::load("media/pistol-with-engravings/source/colt.obj", false, true);
 }
@@ -155,15 +155,15 @@ void SceneBasic_Uniform::setupParticles()
 
     // The particle texture
     glActiveTexture(GL_TEXTURE8);
-    particlesTexture = Texture::loadTexture("media/textures/fire_particles.png");
+    particlesTexture = Texture::loadTexture("media/textures/rain_particle.png");
     glBindTexture(GL_TEXTURE_2D, particlesTexture);
 
     particlesProg.use();
     particlesProg.setUniform("ParticleTex", 8);
     particlesProg.setUniform("ParticleLifetime", particleLifetime);
-    particlesProg.setUniform("ParticleSize", 0.5f);
+    particlesProg.setUniform("ParticleSize", 0.5f); // 0.5
     particlesProg.setUniform("Gravity", vec3(0.0f, -0.2f, 0.0f));
-    particlesProg.setUniform("EmitterPos", emitterPos);
+    //particlesProg.setUniform("EmitterPos", emitterPos);
 }
 
 void SceneBasic_Uniform::setupTextures()
@@ -212,6 +212,7 @@ void SceneBasic_Uniform::initBuffers()
     // Generate the buffers for initial velocity and start (birth) time
     glGenBuffers(1, &initVel); // Initial velocity buffer
     glGenBuffers(1, &startTime); // Start time buffer
+    glGenBuffers(1, &initPos); // Initial position buffer
 
     // Allocate space for all buffers
     int size = nParticles * sizeof(float);
@@ -219,6 +220,9 @@ void SceneBasic_Uniform::initBuffers()
     glBufferData(GL_ARRAY_BUFFER, size * 3, 0, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, startTime);
     glBufferData(GL_ARRAY_BUFFER, size, 0, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, initPos);
+    glBufferData(GL_ARRAY_BUFFER, size * 3, 0, GL_STATIC_DRAW);
+
 
     // Fill the first velocity buffer with random velocities
     glm::mat3 emitterBasis = ParticleUtils::makeArbitraryBasis(emitterDir);
@@ -236,7 +240,8 @@ void SceneBasic_Uniform::initBuffers()
         v.z = sinf(theta) * sinf(phi);
 
         //scale to set the magnitude of the velocity
-        velocity = glm::mix(1.25f, 1.5f, randFloat());
+        //velocity = glm::mix(1.25f, 1.5f, randFloat());
+        velocity = glm::mix(10.0f, 20.0f, randFloat());
         v = glm::normalize(emitterBasis * v) * velocity;
 
         data[3 * i] = v.x;
@@ -254,12 +259,30 @@ void SceneBasic_Uniform::initBuffers()
         data[i] = rate * i;
     }
     glBindBuffer(GL_ARRAY_BUFFER, startTime);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, nParticles * sizeof(float), data.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, size, data.data());
+
+    // Fill the initial position buffer
+    float halfX = 100.0f * 0.5f;
+    float halfZ = 100.0f * 0.5f;
+
+    for (int i = 0; i < nParticles; i++)
+    {
+        float randX = glm::mix(-halfX, +halfX, randFloat());
+        float randZ = glm::mix(-halfZ, +halfZ, randFloat());
+        
+        data[3 * i] = randX;
+        data[3 * i + 1] = 50.0f;
+        data[3 * i + 2] = randZ;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, initPos);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, size * 3, data.data());
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glGenVertexArrays(1, &particles);
     glBindVertexArray(particles);
+
     glBindBuffer(GL_ARRAY_BUFFER, initVel);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -268,8 +291,13 @@ void SceneBasic_Uniform::initBuffers()
     glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
 
+    glBindBuffer(GL_ARRAY_BUFFER, initPos);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+
     glVertexAttribDivisor(0, 1);
     glVertexAttribDivisor(1, 1);
+    glVertexAttribDivisor(2, 1);
 
     glBindVertexArray(0);
 }
@@ -631,7 +659,6 @@ void SceneBasic_Uniform::drawScene()
     particlesProg.use();
     setMatrices(particlesProg);
     particlesProg.setUniform("Time", time);
-    particlesProg.setUniform("EmitterPos", emitterPos);
     glBindVertexArray(particles);
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, nParticles);
     glBindVertexArray(0);

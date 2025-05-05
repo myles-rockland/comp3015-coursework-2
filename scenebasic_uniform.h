@@ -24,7 +24,7 @@ private:
     GLSLProgram hdrBloomProg, pbrProg, skyboxProg, particlesProg;
 
     Random rand;
-    GLuint initVel, startTime, particles, nParticles;
+    GLuint initPos, initVel, startTime, particles, nParticles;
     vec3 emitterPos, emitterDir;
     float time, particleLifetime;
 
