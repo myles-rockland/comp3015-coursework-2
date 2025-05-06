@@ -36,6 +36,7 @@ The Cook-Torrance BRDF is composed of the following implementations:
 - Normal Distribution Function - GGX/Trowbridge-Reitz Implementation
 - Geometry Function - Schlick-GGX Implementation
 - Fresnel Function - Fresnel-Schlick Implementation
+
 See the following code snippet of [pbr.frag](./shader/pbr.frag) showing some of the implementation:
 ```glsl
 ...
@@ -68,6 +69,7 @@ Rain particles fall from the area above the plane, which eventually stop after 3
 Setup of the particles can be seen in [scenebasic_uniform.cpp](./scenebasic_uniform.cpp) in `SceneBasic_Uniform::setupParticles()` and `SceneBasic_Uniform::initBuffers()`.
 `SceneBasic_Uniform::setupParticles()` is used for loading the particle texture, and setting the uniforms for the particle shader program.
 `SceneBasic_Uniform::initBuffers()` concerns itself with the setup of vertex attribute arrays and sending particle data from the CPU to the GPU, including their initial positions, velocities, and start times.
+
 See the following code snippet of `SceneBasic_Uniform::initBuffers()` for an example of setting initial particle positions:
 ```cpp
 void SceneBasic_Uniform::initBuffers()
@@ -129,6 +131,7 @@ Each pass does the following:
 - Pass 3: Performs a vertical gaussian blur on blur texture 1 and outputs it to blur texture 2.
 - Pass 4: Performs a horizontal gaussian blur on blue texture 2 and outputs it to blur texture 1.
 - Pass 5: If bloom is enabled, this pass will add blur texture 1 onto the HDR texture. Tone mapping and gamma correction are then applied for the final image.
+
 Please see the following code snippet of each pass in [hdrBloom.frag](./shader/hdrBloom.frag):
 ```glsl
 ...
@@ -183,7 +186,9 @@ vec4 pass5()
 
 ## Feature 4 - Fog
 A black fog effect is applied to all objects rendered with PBR, causing objects that are further away to become obscured in a black fog.
-This happens in pass 1 of [pbr.frag](./shader/pbr.frag). Please see the following code example:
+This happens in pass 1 of [pbr.frag](./shader/pbr.frag). 
+
+Please see the following code example:
 ```glsl
 vec4 pass1()
 {
