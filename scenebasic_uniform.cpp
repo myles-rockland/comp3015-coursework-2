@@ -66,6 +66,9 @@ void SceneBasic_Uniform::initScene()
 
     pbrProg.use();
     pbrProg.setUniform("Gamma", 2.2f);
+    pbrProg.setUniform("Fog.MinDist", 10.0f);
+    pbrProg.setUniform("Fog.MaxDist", 15.0f);
+    pbrProg.setUniform("Fog.Colour", vec3(0.0f));
 
     // Setup skybox, gun textures
     setupTextures();

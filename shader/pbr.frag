@@ -1,6 +1,7 @@
 #version 460
 
 in vec2 TexCoord;
+in vec3 Position;
 
 in vec3 TangentFragPos;
 in vec3 TangentCameraPos;
@@ -28,7 +29,16 @@ uniform struct SpotLightInfo
     float OuterCutoff;
 } Spotlight;
 
+uniform struct FogInfo
+{
+    float MinDist;
+    float MaxDist;
+    vec3 Colour;
+} Fog;
+
 uniform float Gamma;
+
+uniform vec4 CameraPos;
 
 const float PI = 3.14159265358979323846;
 
@@ -123,12 +133,17 @@ vec4 pass1()
     norm.xy = 2.0f * norm.xy - 1.0f;
     norm = (gl_FrontFacing) ? normalize(norm) : normalize(-norm);
 
+    // Calculate PBR colour
     vec3 Colour = vec3(0.0f, 0.0f, 0.0f);
-
     Colour += microfacetModel(TangentFragPos, norm);
-
     vec3 ambient = vec3(0.03) * texture(AlbedoTexture, TexCoord).rgb * texture(AOTexture, TexCoord).rgb;
     Colour += ambient;
+
+    // Calculate Fog colour
+    float dist = length(Position - CameraPos.xyz);
+    float fogFactor = (Fog.MaxDist - dist)/(Fog.MaxDist - Fog.MinDist);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    Colour = mix(Fog.Colour, Colour, fogFactor);
 
     return vec4(Colour, 1);
 }

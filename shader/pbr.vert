@@ -8,6 +8,7 @@ layout (location = 3) in vec4 VertexTangent;
 
 // Out variables
 out vec2 TexCoord;
+out vec3 Position;
 
 out vec3 TangentFragPos;
 out vec3 TangentCameraPos;
@@ -43,8 +44,9 @@ void main()
     // Get camera position in tangent space
     TangentCameraPos = TBN * CameraPos.xyz;
 
-    // Get fragment position in tangent space
-    TangentFragPos = TBN * (ModelViewMatrix * vec4(VertexPosition, 1.0f)).xyz;
+    // Get fragment position in view space and tangent space
+    Position = (ModelViewMatrix * vec4(VertexPosition, 1.0f)).xyz;
+    TangentFragPos = TBN * Position;
 
     // Set spotlight positions in tangent space
     TangentSpotlightPos = TBN * Spotlight.Position.xyz;
