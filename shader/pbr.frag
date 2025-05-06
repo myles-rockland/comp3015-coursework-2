@@ -71,10 +71,9 @@ vec3 microfacetModel(vec3 position, vec3 n) // Reflectance Equation
 
     if (angle >= 0.0f && angle < Spotlight.OuterCutoff) // OuterCutoff
     {
-        //float interpolation = (angle - Spotlights[lightIndex].InnerCutoff) / (Spotlights[lightIndex].OuterCutoff - Spotlights[lightIndex].InnerCutoff);
-        //float epsilon = cos(Spotlights[lightIndex].OuterCutoff) - cos(Spotlights[lightIndex].InnerCutoff);
-        //float intensity = clamp((cosAngle - cos(Spotlights[lightIndex].OuterCutoff)) / epsilon, 0.0, 1.0);
-        lightIntensity = Spotlight.L; //* intensity;
+        float epsilon = cos(Spotlight.InnerCutoff) - cos(Spotlight.OuterCutoff);
+        float intensity = clamp((cosAngle - cos(Spotlight.OuterCutoff)) / epsilon, 0.0, 1.0);
+        lightIntensity = Spotlight.L * intensity;
 
         l = TangentSpotlightPos - position;
         float dist = length(l);

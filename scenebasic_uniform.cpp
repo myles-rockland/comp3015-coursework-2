@@ -58,9 +58,9 @@ void SceneBasic_Uniform::initScene()
 
     // Set misc uniforms
     hdrBloomProg.use();
-    hdrBloomProg.setUniform("LumThresh", 5.0f); // 1.2f or 3.0f or 5.0f 
-    hdrBloomProg.setUniform("Exposure", 0.1f); // 0.35f
-    hdrBloomProg.setUniform("White", 0.982f);
+    hdrBloomProg.setUniform("LumThresh", 30.0f); // 1.2f or 3.0f or 5.0f // Measured 30.0f on pass 2. Ideally [0.2, 0.5] * AveLum
+    hdrBloomProg.setUniform("Exposure", 0.1f); // 0.35f, 0.1 // Ideally 0.18 / AveLum
+    hdrBloomProg.setUniform("White", 0.982f); // 0.982f // Ideally the luminance of the brightest parts of the image.
     hdrBloomProg.setUniform("Gamma", 2.2f);
     hdrBloomProg.setUniform("BloomEnabled", bloomEnabled);
 
@@ -171,7 +171,8 @@ void SceneBasic_Uniform::setupParticles()
 void SceneBasic_Uniform::setupTextures()
 {
     // Load skybox texture
-    GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
+    //GLuint skyboxTexture = Texture::loadHdrCubeMap("media/desert_skybox/desert");
+    GLuint skyboxTexture = Texture::loadHdrCubeMap("media/overcast_skybox/overcast");
 
     // Load default textures
     defaultAlbedoTexture = Texture::loadTexture("media/textures/grey_1x1.png");
@@ -249,7 +250,6 @@ void SceneBasic_Uniform::initBuffers()
         v.z = sinf(theta) * sinf(phi);
 
         //scale to set the magnitude of the velocity
-        //velocity = glm::mix(1.25f, 1.5f, randFloat());
         velocity = glm::mix(10.0f, 20.0f, randFloat());
         v = glm::normalize(emitterBasis * v) * velocity;
 
@@ -618,6 +618,20 @@ void SceneBasic_Uniform::render()
     pass3();
     pass4();
     pass5();
+
+
+    /* // Code to blit a pass to the default framebuffer
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, blurFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(
+        0, 0, width, height,    // source rect
+        0, 0, width, height,    // dest rect
+        GL_COLOR_BUFFER_BIT,    // what to copy
+        GL_NEAREST              // filtering 
+    );
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    */
+    
 }
 
 void SceneBasic_Uniform::drawScene()
@@ -757,8 +771,7 @@ void SceneBasic_Uniform::computeLogAveLuminance()
     for (int i = 0; i < size; i++)
     {
         float lum = dot(vec3(texData[i * 3 + 0], texData[i * 3 + 1], texData[i * 3 + 2]), vec3(0.2126f, 0.7152f, 0.0722f));
-        if (!std::isfinite(lum)) continue;
-        sum += logf(lum + 0.00001f);
+        sum += logf(lum + 0.00001f); //if (std::isfinite(lum))
     }
     hdrBloomProg.use();
     hdrBloomProg.setUniform("AveLum", expf(sum / size));
