@@ -3,17 +3,24 @@ An OpenGL project showcasing advanced shader techniques including Bloom, PBR, an
 
 ![OpenGL Scene](./images/scene.gif)
 
-This project has been written and tested using Visual Studio 2022 on a Windows 10 machine.
+## YouTube Video Walkthrough
+YouTube Video: Coming soon
 
+## Prerequisites
 > [!IMPORTANT]
 > This project assumes an OpenGL directory has been set up in the "C:/Users/Public/" directory. Please see the project properties in Visual Studio for more details on include directories.
 
-## Attributions
+### Libraries
+- [GLFW 3](https://www.glfw.org/)
+- [GLAD](https://glad.dav1d.de/#language=c&specification=gl&api=gl%3D4.6&api=gles1%3Dnone&api=gles2%3Dnone&api=glsc2%3Dnone&profile=core&loader=on) (GL 4.6, Core Profile)
+- [GLM](https://github.com/g-truc/glm)
+
+### Development Environment
+This project has been written and tested using Visual Studio 2022 on a Windows 10 machine.
+
+### Asset Attributions
 - Pistol with Engravings Model: https://sketchfab.com/3d-models/pistol-with-engravings-bccd75a0016d49448243135a56facb96#download
 - Target Model: https://sketchfab.com/3d-models/pbr-target-ea1bec8a10054369862412c6d451e558
-
-## YouTube Video Walkthrough
-YouTube Video: Coming soon
 
 ## Controls
 - Move Around - WASD
@@ -22,7 +29,14 @@ YouTube Video: Coming soon
 - Toggle Bloom - 3
 
 ## Feature 1 - PBR
-All objects in the scene are rendered in pass 1 with PBR textures (albedo, normal, roughness, metallic, AO maps). Mainly implemented in [pbr.frag](./shader/pbr.frag), and adapted for a flashlight.
+All objects in the scene are rendered in `SceneBasic_Uniform::pass1()` with PBR textures (albedo, normal, roughness, metallic, AO maps).
+The main PBR implementation lies in [pbr.frag](./shader/pbr.frag), adapted for a flashlight which is a spotlight that follows the camera's movements. 
+This uses the microfacet model to calculate surface reflectivity with Lambertian diffuse, Cook-Torrance BRDF, and an added ambient factor based on the sampled albedo and ambient occlusion maps.
+The Cook-Torrance BRDF is composed of the following implementations:
+- Normal Distribution Function - GGX/Trowbridge-Reitz Implementation
+- Geometry Function - Schlick-GGX Implementation
+- Fresnel Function - Fresnel-Schlick Implementation
+See the following code snippet of [pbr.frag](./shader/pbr.frag) showing some of the implementation:
 ```glsl
 ...
 // Pass 1 applies normal mapping, PBR for a flashlight, and fog colouring
@@ -50,7 +64,11 @@ void main() {
 ```
 
 ## Feature 2 - Particle Rain
-Rain particles fall from the area above the plane. Setup seen in [scenebasic_uniform.cpp](./scenebasic_uniform.cpp) in `SceneBasic_Uniform::setupParticles()` and `SceneBasic_Uniform::initBuffers()`. Example of setting initial particle positions:
+Rain particles fall from the area above the plane, which eventually stop after 30 seconds.
+Setup of the particles can be seen in [scenebasic_uniform.cpp](./scenebasic_uniform.cpp) in `SceneBasic_Uniform::setupParticles()` and `SceneBasic_Uniform::initBuffers()`.
+`SceneBasic_Uniform::setupParticles()` is used for loading the particle texture, and setting the uniforms for the particle shader program.
+`SceneBasic_Uniform::initBuffers()` concerns itself with the setup of vertex attribute arrays and sending particle data from the CPU to the GPU, including their initial positions, velocities, and start times.
+See the following code snippet of `SceneBasic_Uniform::initBuffers()` for an example of setting initial particle positions:
 ```cpp
 void SceneBasic_Uniform::initBuffers()
 {
@@ -74,7 +92,7 @@ void SceneBasic_Uniform::initBuffers()
 	...
 }
 ```
-Example code in [particles.vert](./shader/particles.vert) that calculates particle positions based on SUVAT equations:
+See the following code snippet of [particles.vert](./shader/particles.vert) that calculates particle positions based on SUVAT equations:
 ```glsl
 ...
 // Offsets to the position in camera coordinates for each vertex of the particle's quad
@@ -103,7 +121,15 @@ void main()
 ```
 
 ## Feature 3 - Bloom
-Bloom effect is applied in render passes 2-5 in [hdrBloom.frag](./shader/hdrBloom.frag):
+When shining the flashlight on the gun on the floor, bloom gives the gun more pronounced light reflections, resulting in a "bleeding" effect.
+The bloom effect is applied in render passes 2-5 in `SceneBasicUniform::render()` and [hdrBloom.frag](./shader/hdrBloom.frag).
+Each pass does the following:
+- Pass 1: Draws the scene as normal to a HDR texture.
+- Pass 2: Performs a bright-pass on the HDR texture, extracts all fragments above a given luminance threshold and outputs it to blur texture 1.
+- Pass 3: Performs a vertical gaussian blur on blur texture 1 and outputs it to blur texture 2.
+- Pass 4: Performs a horizontal gaussian blur on blue texture 2 and outputs it to blur texture 1.
+- Pass 5: If bloom is enabled, this pass will add blur texture 1 onto the HDR texture. Tone mapping and gamma correction are then applied for the final image.
+Please see the following code snippet of each pass in [hdrBloom.frag](./shader/hdrBloom.frag):
 ```glsl
 ...
 // Pass 2 is checking hdr texture sample against luminance threshold
@@ -156,7 +182,8 @@ vec4 pass5()
 ```
 
 ## Feature 4 - Fog
-Black fog effect is applied to objects rendered with PBR in pass 1 of [pbr.frag](./shader/pbr.frag):
+A black fog effect is applied to all objects rendered with PBR, causing objects that are further away to become obscured in a black fog.
+This happens in pass 1 of [pbr.frag](./shader/pbr.frag). Please see the following code example:
 ```glsl
 vec4 pass1()
 {

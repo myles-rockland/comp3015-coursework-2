@@ -42,11 +42,6 @@ uniform vec4 CameraPos;
 
 const float PI = 3.14159265358979323846;
 
-float luminance(vec3 colour)
-{
-    return colour.r * 0.2126 + colour.g * 0.7152 + colour.b * 0.0722;
-}
-
 // normal distribution function for approximating ratio of microfacets aligned to h
 float ggxDistribution(float nDotH, float roughness) 
 { 
