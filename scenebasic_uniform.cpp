@@ -58,7 +58,7 @@ void SceneBasic_Uniform::initScene()
 
     // Set misc uniforms
     hdrBloomProg.use();
-    hdrBloomProg.setUniform("LumThresh", 30.0f); // 1.2f or 3.0f or 5.0f // Measured 30.0f on pass 2. Ideally [0.2, 0.5] * AveLum
+    hdrBloomProg.setUniform("LumThresh", 1.2f); // 1.2f or 3.0f or 5.0f // Measured 30.0f on pass 2. Ideally [0.2, 0.5] * AveLum
     hdrBloomProg.setUniform("Exposure", 0.1f); // 0.35f, 0.1 // Ideally 0.18 / AveLum
     hdrBloomProg.setUniform("White", 0.982f); // 0.982f // Ideally the luminance of the brightest parts of the image.
     hdrBloomProg.setUniform("Gamma", 2.2f);
@@ -364,8 +364,8 @@ void SceneBasic_Uniform::setupBlurFBO()
 
     // Create two texture objects to ping-pong for the bright-pass filter
     // and the two-pass blur
-    bloomBufWidth = width / 8;
-    bloomBufHeight = height / 8;
+    bloomBufWidth = width;
+    bloomBufHeight = height;
 
     glGenTextures(1, &tex1);
     glActiveTexture(GL_TEXTURE1);
