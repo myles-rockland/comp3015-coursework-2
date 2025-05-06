@@ -1,5 +1,5 @@
 # COMP3015 Coursework 2
-An OpenGL project showcasing advanced shader techniques including Bloom, PBR, and Particles.
+An OpenGL project showcasing advanced shader techniques including Bloom, PBR, and Particles. A continuation from [coursework 1](https://github.com/myles-rockland/comp3015-coursework-1).
 
 ![OpenGL Scene](./images/scene.gif)
 
