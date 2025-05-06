@@ -9,8 +9,8 @@ This project has been written and tested using Visual Studio 2022 on a Windows 1
 > This project assumes an OpenGL directory has been set up in the "C:/Users/Public/" directory. Please see the project properties in Visual Studio for more details on include directories.
 
 ## Attributions
-Pistol with Engravings Model: https://sketchfab.com/3d-models/pistol-with-engravings-bccd75a0016d49448243135a56facb96#download
-Target Model: https://sketchfab.com/3d-models/pbr-target-ea1bec8a10054369862412c6d451e558
+- Pistol with Engravings Model: https://sketchfab.com/3d-models/pistol-with-engravings-bccd75a0016d49448243135a56facb96#download
+- Target Model: https://sketchfab.com/3d-models/pbr-target-ea1bec8a10054369862412c6d451e558
 
 ## YouTube Video Walkthrough
 YouTube Video: Coming soon
@@ -24,6 +24,7 @@ YouTube Video: Coming soon
 ## Feature 1 - PBR
 All objects in the scene are rendered in pass 1 with PBR textures (albedo, normal, roughness, metallic, AO maps). Mainly implemented in [pbr.frag](./shader/pbr.frag), and adapted for a flashlight.
 ```glsl
+...
 // Pass 1 applies normal mapping, PBR for a flashlight, and fog colouring
 vec4 pass1()
 {
@@ -75,6 +76,7 @@ void SceneBasic_Uniform::initBuffers()
 ```
 Example code in [particles.vert](./shader/particles.vert) that calculates particle positions based on SUVAT equations:
 ```glsl
+...
 // Offsets to the position in camera coordinates for each vertex of the particle's quad
 const vec3 offsets[] = vec3[](vec3(-0.5,-0.5,0), vec3(0.5,-0.5,0), vec3(0.5,0.5,0),
 							  vec3(-0.5,-0.5,0), vec3(0.5,0.5,0), vec3(-0.5,0.5,0));
@@ -103,6 +105,7 @@ void main()
 ## Feature 3 - Bloom
 Bloom effect is applied in render passes 2-5 in [hdrBloom.frag](./shader/hdrBloom.frag):
 ```glsl
+...
 // Pass 2 is checking hdr texture sample against luminance threshold
 vec4 pass2()
 {
