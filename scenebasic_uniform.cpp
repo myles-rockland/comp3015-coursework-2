@@ -168,7 +168,6 @@ void SceneBasic_Uniform::setupParticles()
     particlesProg.setUniform("ParticleLifetime", particleLifetime);
     particlesProg.setUniform("ParticleSize", 0.5f); // 0.5
     particlesProg.setUniform("Gravity", vec3(0.0f, -0.2f, 0.0f));
-    //particlesProg.setUniform("EmitterPos", emitterPos);
 }
 
 void SceneBasic_Uniform::setupTextures()

@@ -74,12 +74,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shader\basic_uniform.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shader\basic_uniform.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shader\particles.frag">
       <Filter>shaders</Filter>
     </None>

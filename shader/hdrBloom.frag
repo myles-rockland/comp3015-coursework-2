@@ -41,15 +41,7 @@ float luminance(vec3 colour)
 vec4 pass2()
 {
     vec4 val = texture(HdrTex, TexCoord);
-    
-    if(luminance(val.rgb) > LumThresh)
-    {
-        return val;
-    }
-    else
-    {
-        return vec4(0.0);
-    }
+    return (luminance(val.rgb) > LumThresh) ? val : vec4(0.0);
 }
 
 // Pass 3 is applying blur in y direction

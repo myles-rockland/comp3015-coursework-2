@@ -125,7 +125,7 @@ vec3 microfacetModel(vec3 position, vec3 n) // Reflectance Equation
     return (diffuse + specular) * lightIntensity * nDotL;
 }
 
-// Pass 1 applies normal mapping, alpha discard and blinnphong lighting for 3 spotlights
+// Pass 1 applies normal mapping, PBR for a flashlight, and fog colouring
 vec4 pass1()
 {
     // Calculate normal direction from normal map texture. Already in tangent space, so no conversion

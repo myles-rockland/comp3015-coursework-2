@@ -170,8 +170,6 @@ xcopy /y /i /e "$(ProjectDir)shader" "$(OutDir)shader\"</Command>
     <ClCompile Include="Spotlight.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shader\basic_uniform.frag" />
-    <None Include="shader\basic_uniform.vert" />
     <None Include="shader\hdrBloom.frag" />
     <None Include="shader\hdrBloom.vert" />
     <None Include="shader\pbr.frag" />
