@@ -4,7 +4,7 @@ An OpenGL project showcasing advanced shader techniques including Bloom, PBR, an
 ![OpenGL Scene](./images/scene.gif)
 
 ## YouTube Video Walkthrough
-YouTube Video: Coming soon
+YouTube Video: https://youtu.be/fdhbRb3WB7E
 
 ## Prerequisites
 > [!IMPORTANT]
